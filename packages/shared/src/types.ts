@@ -29,6 +29,8 @@ export type Measurements = z.infer<typeof S.MeasurementsSchema>;
 export type Profile = z.infer<typeof S.ProfileSchema>;
 export type Outfit = z.infer<typeof S.OutfitSchema>;
 export type OutfitItem = z.infer<typeof S.OutfitItemSchema>;
+export type Order = z.infer<typeof S.OrderSchema>;
+export type OrderLine = z.infer<typeof S.OrderLineSchema>;
 
 export type DimResult = z.infer<typeof S.DimResultSchema>;
 export type SizeResult = z.infer<typeof S.SizeResultSchema>;

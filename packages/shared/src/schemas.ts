@@ -140,6 +140,30 @@ export const OutfitItemSchema = z.object({
   position: z.number().int().nullable(),
 });
 
+// ---- Orders ----
+// Status values are not specified yet (docs/checkout-privacy.md), so they stay free text like the SQL.
+
+export const OrderLineSchema = z.object({
+  orderId: z.uuid(),
+  garmentId: z.uuid(),
+  size: z.string().nullable(),
+  retailer: z.string().nullable(),
+  priceCents: z.number().int().nonnegative().nullable(),
+  status: z.string().nullable(),
+});
+
+export const OrderSchema = z.object({
+  id: z.uuid(),
+  profileId: z.uuid(),
+  outfitId: z.uuid(),
+  status: z.string().nullable(),
+  totalCents: z.number().int().nonnegative().nullable(),
+  paymentProvider: z.string().nullable(),
+  paymentRef: z.string().nullable(),
+  createdAt: z.iso.datetime({ offset: true }),
+  lines: z.array(OrderLineSchema),
+});
+
 // ---- Fit results ----
 
 export const DimResultSchema = z.object({

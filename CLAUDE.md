@@ -41,15 +41,19 @@ Layout and data model: `docs/architecture.md`.
 
 ## Commands
 
-<!-- Fill in after M0 scaffolding. -->
-- Dev: `TODO`
-- Test: `TODO` (vitest)
+- Install: `pnpm install` (Node 22, pnpm 12)
+- Dev: `pnpm dev` (web at http://localhost:3000; health at `/api/health`)
+- Test: `pnpm test` (vitest, from the repo root)
+- Typecheck / lint / format: `pnpm typecheck`, `pnpm lint`, `pnpm format`
+- Build web: `pnpm --filter @fitmirror/web build`
+- Env: copy `apps/web/.env.example` to `apps/web/.env.local`
 - Demo mode: `DEMO_MODE=true` env, or `?demo=1` in the URL
 
 ## Current status
 
-- Milestone: **M0** (not started)
-- Open questions in `docs/build-plan.md` section 18: **unanswered**, so the defaults in the docs apply.
+- Milestone: **M0** in progress. Done: monorepo, `packages/shared` types/schemas/dims/units, `apps/web` skeleton. Next: extension skeleton, Supabase migration + seed, placeholder fixtures, Vercel deploy.
+- Open questions in `docs/build-plan.md` section 18: **mostly unanswered**, so the defaults in the docs apply. M0 decisions are recorded there.
+- Versions pinned on purpose: TypeScript 6.0 (typescript-eslint does not support 7), Next 15.5 (latest is 16).
 
 ## Source of truth
 
