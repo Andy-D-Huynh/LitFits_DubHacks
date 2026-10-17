@@ -177,7 +177,8 @@ export const IngestRequestSchema = z.object({
   title: z.string().optional(),
   jsonld: z.unknown().optional(),
   imageUrls: z.array(z.url()).max(8).default([]),
-  chartHtml: z.string().optional(),
+  // The extension strips style/class/script from the table before sending.
+  chartHtml: z.string().max(20_000).optional(),
   pageText: z.string().max(8000).optional(),
   screenshotPath: z.string().optional(),
 });

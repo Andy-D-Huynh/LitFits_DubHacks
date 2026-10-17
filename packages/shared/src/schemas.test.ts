@@ -40,6 +40,15 @@ describe('IngestRequestSchema', () => {
     expect(IngestRequestSchema.parse(base).imageUrls).toEqual([]);
   });
 
+  it('caps chartHtml at 20,000 chars', () => {
+    expect(IngestRequestSchema.safeParse({ ...base, chartHtml: 'x'.repeat(20_000) }).success).toBe(
+      true,
+    );
+    expect(IngestRequestSchema.safeParse({ ...base, chartHtml: 'x'.repeat(20_001) }).success).toBe(
+      false,
+    );
+  });
+
   it('caps pageText at 8000 chars and images at 8', () => {
     expect(IngestRequestSchema.safeParse({ ...base, pageText: 'x'.repeat(8001) }).success).toBe(
       false,

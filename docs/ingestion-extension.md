@@ -7,7 +7,7 @@ Spec sections 9 and 12. Extension first, server fallback.
 1. JSON-LD with `@type: Product`: name, brand, image, color, sku, `offers.price`, `priceCurrency`.
 2. OpenGraph and meta tags as fallback.
 3. Size chart: find tables whose cells contain size labels (XS to XXL, or numeric waist sizes). If none, look for a button or link with text like "size guide" or "size chart", click it, wait 800 ms, then re-scan for tables.
-4. Collect up to 8 image URLs and up to 8000 chars of visible page text.
+4. Collect up to 8 image URLs and up to 8000 chars of visible page text. Send the chart table as `chartHtml` after stripping `style`, `class`, and `<script>` from it; the server rejects `chartHtml` over 20,000 chars.
 5. POST to `/api/garments/ingest`.
 
 ## Server normalization (LLM call)

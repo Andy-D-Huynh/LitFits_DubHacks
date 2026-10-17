@@ -153,7 +153,7 @@ type FitResult = {
 - `PUT /api/profile` creates or updates the profile (manual edits set source to `manual`).
 
 **Garments and fit**
-- `POST /api/garments/ingest` takes `source` (extension | url | screenshot), `url`, `title`, `jsonld`, `imageUrls`, `chartHtml`, `pageText` (max 8000 chars), optional screenshot path. Returns `Garment`. Idempotent on `source_url`.
+- `POST /api/garments/ingest` takes `source` (extension | url | screenshot), `url`, `title`, `jsonld`, `imageUrls`, `chartHtml` (max 20,000 chars, style/class/script stripped by the extension), `pageText` (max 8000 chars), optional screenshot path. Returns `Garment`. Idempotent on `source_url`.
 - `GET /api/garments/:id`.
 - `POST /api/fit` takes `garmentId`, `profileId` → `FitResult`. Pure computation, no LLM.
 - `GET /api/alternatives?garmentId=&profileId=` returns ingested garments of the same category ranked by fit score for this user.

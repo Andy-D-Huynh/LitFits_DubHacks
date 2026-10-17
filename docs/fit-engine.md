@@ -15,7 +15,7 @@ Ease = garment dim − body dim, in cm of circumference. Starting targets:
 |---|---|---|---|
 | Top chest ease | 4 to 8 | 8 to 16 | 16 to 26 |
 | Top waist ease | 2 to 8 | 6 to 18 | 14 to 28 |
-| Top shoulder ease | — | −1 to 3 | up to 8 (drop shoulder) |
+| Top shoulder ease | −2 to 2 | −1 to 3 | −1 to 8 (drop shoulder) |
 | Bottom hip ease | 2 to 6 | 4 to 10 | 10 to 20 |
 
 - Bottom waist ease: 0 to 4 (stretch: −4 to 2).
@@ -31,9 +31,9 @@ Ease = garment dim − body dim, in cm of circumference. Starting targets:
 
 - Per dim: `1.0` if inside the target band, else `max(0, 1 - distanceOutsideBand / 10)`.
 - Weights:
-  - Top: chest 0.5, shoulder 0.25, length 0.15, waist 0.1
+  - Top: chest 0.5, shoulder 0.25, waist 0.1, renormalized to sum to 1 (≈ 0.588, 0.294, 0.118). **Length is excluded from scoring** because no body measurement corresponds to it.
   - Bottom: waist 0.4, hip 0.35, inseam 0.25
-- Overall verdict:
+- **Sleeve is note-only:** it gets a `DimResult` with a verdict and note when both values exist, but no score weight.- Overall verdict:
   - `tight` if any critical dim (chest, waist, hip) is more than 3 cm below its minimum ease
   - `loose` if the main dim exceeds its maximum by more than 6 cm
   - else `good` if score ≥ 0.8
