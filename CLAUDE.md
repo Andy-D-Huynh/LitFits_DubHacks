@@ -18,7 +18,9 @@ FitMirror answers *does it fit* first, using the retailer's real size chart agai
 
 **Tier 1 (must work, demo-critical):** manual body profile · Chrome extension "Add to figure" with product and size chart extraction · ingestion API with LLM normalization and fixtures fallback · deterministic fit engine with per-size verdicts and explanations · Studio (figure viewport, fit panel, outfit tray) · outfit editing (add/remove/swap/change size, with undo) · cached 2D try-on render.
 
-**Tier 2 (should work):** phone capture via QR with in-browser pose estimation · 3D mannequin with fit heatmap · saved outfits and compare · cart by retailer plus VISA sandbox checkout · fits-you-better alternatives.
+**Tier 2 (should work):** phone capture via QR with in-browser pose estimation · saved outfits and compare · cart by retailer plus VISA sandbox checkout · fits-you-better alternatives.
+
+**Deferred:** 3D mannequin with fit heatmap (was tier 2). Research only; do not build until the team un-defers it.
 
 **Tier 3 (only after tier 1 and 2 checkpoints pass):** Photon messaging agent · auto add-to-cart adapters · face-in-figure, polish, rewards, vibe matching.
 
@@ -29,13 +31,14 @@ Full detail: `docs/product.md`.
 ## Stack
 
 - Monorepo, pnpm workspaces
-- `apps/web`: Next.js 15 (App Router), Tailwind, shadcn/ui, Zustand, TanStack Query, react-three-fiber + drei
+- `apps/web`: Next.js 15 (App Router), Tailwind, shadcn/ui, Zustand, TanStack Query (react-three-fiber + drei only once 3D is un-deferred)
 - `apps/extension`: Chrome Manifest V3, Vite + CRXJS, React side panel
 - Backend: Next.js route handlers only, no separate Python service
 - Data: Supabase (Postgres, private Storage, Realtime)
 - Pose and segmentation: `@mediapipe/tasks-vision`, run in the phone browser
 - LLM (extraction only): Anthropic API, model name from env
 - `packages/shared`: types, zod schemas, fit engine, fit rules, units, measurement math. Used by web and extension.
+- Pinned on purpose: TypeScript 6.0 (typescript-eslint does not support 7), Next 15.5 (latest is 16).
 
 Layout and data model: `docs/architecture.md`.
 
@@ -50,11 +53,11 @@ Layout and data model: `docs/architecture.md`.
 - Env: copy `apps/web/.env.example` to `apps/web/.env.local`
 - Demo mode: `DEMO_MODE=true` env, or `?demo=1` in the URL
 
-## Current status
+## Owners
 
-- Milestone: **M0** in progress. Done: monorepo, `packages/shared` types/schemas/dims/units, `apps/web` skeleton, `apps/extension` skeleton. Next: Supabase migration + seed, placeholder fixtures, Vercel deploy.
-- Open questions in `docs/build-plan.md` section 18: **mostly unanswered**, so the defaults in the docs apply. M0 decisions are recorded there.
-- Versions pinned on purpose: TypeScript 6.0 (typescript-eslint does not support 7), Next 15.5 (latest is 16).
+- **Andy**: back end for the 2D flow: Supabase schema and migrations, ingest API and LLM normalization, fit engine, try-on pipeline.
+- **Partner**: studio UI and Chrome extension.
+- **Third teammate**: 3D research. 3D is deferred and not on the critical path.
 
 ## Source of truth
 

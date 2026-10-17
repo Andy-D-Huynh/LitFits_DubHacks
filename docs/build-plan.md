@@ -16,7 +16,7 @@ Spec sections 15 and 18. Times assume roughly a 36-hour hack and a team of three
 | **M0** | h0–2 | Repo, Supabase, deploy skeleton, shared types, fixtures loaded. | — |
 | **M1** | h2–10 | A: manual profile + `MeasurementEditor`. C: fit engine with unit tests. Studio with `FitPanel` on fixtures. Outfit store with add, remove, swap, undo. | Pick a fixture, see a size verdict with explanations. |
 | **M2** | h2–14 (parallel) | B: ingest API, LLM normalization, extension content script and side panel. | Click Add to figure on a real product page and get a garment row. |
-| **M3** | h10–20 | C: try-on providers, caching, queue, viewport; 3D mannequin with heatmap. | Render appears next to verdict; swapping or removing an item re-renders only the affected layers. |
+| **M3** | h10–20 | C: try-on providers, caching, queue, viewport. (3D mannequin with heatmap: **deferred**, see question 1.) | Render appears next to verdict; swapping or removing an item re-renders only the affected layers. |
 | **M4** | h14–22 | A: phone capture, QR handoff, MediaPipe estimation, calibration against tape measurements. | — |
 | **M5** | h20–28 | D: outfits, compare, cart by retailer, VISA sandbox flow, alternatives. **Feature freeze at h28.** | — |
 | **M6** | h28–34 | Polish, demo mode, recorded fallback video, README, rehearsal. | — |
@@ -33,7 +33,7 @@ Spec sections 15 and 18. Times assume roughly a 36-hour hack and a team of three
 Answer these and the defaults in the docs get replaced. Write answers inline and update the affected doc.
 
 1. Team size, event length, and who owns which workstream?
-   - Answer: _TODO_
+   - Answer: three people. Andy owns the 2D back end (schema, ingest API, fit engine, try-on pipeline). A partner owns the studio UI and the extension. A third teammate researches 3D, which is **deferred** (out of M3 until un-deferred). Event length: _TODO_.
 2. What exactly does the VISA track prompt ask for, and which Visa APIs or sandboxes are provided? (Checkout design is a placeholder until this is known.)
    - Answer: _TODO_
 3. What does Photon offer (API, channel, sandbox)? Is the side track still undecided?
