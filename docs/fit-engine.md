@@ -33,7 +33,8 @@ Ease = garment dim − body dim, in cm of circumference. Starting targets:
 - Weights:
   - Top: chest 0.5, shoulder 0.25, waist 0.1, renormalized to sum to 1 (≈ 0.588, 0.294, 0.118). **Length is excluded from scoring** because no body measurement corresponds to it.
   - Bottom: waist 0.4, hip 0.35, inseam 0.25
-- **Sleeve is note-only:** it gets a `DimResult` with a verdict and note when both values exist, but no score weight.- Overall verdict:
+- **Sleeve is note-only:** it gets a `DimResult` with a verdict and note when both values exist, but no score weight.
+- **Missing dims:** when a scored dim can't be evaluated for a size (absent from the chart or from the profile), renormalize the weights over the dims that were evaluated, and add an explanation line naming what wasn't checked, e.g. "Inseam not checked: the size chart has no inseam." Only scored dims count as missing; length and sleeve never do. The fewer-than-two-critical-dims rule below still applies.- Overall verdict:
   - `tight` if any critical dim (chest, waist, hip) is more than 3 cm below its minimum ease
   - `loose` if the main dim exceeds its maximum by more than 6 cm
   - else `good` if score ≥ 0.8
@@ -43,7 +44,8 @@ Ease = garment dim − body dim, in cm of circumference. Starting targets:
 
 - `high`: only if the chart is garment-type, `extraction_method` is `dom` or `fixture`, and all critical body dims are manual.
 - `medium`: body dims came from photos.
-- `low`: chart came from vision LLM, or key dims are missing.
+- `low`: chart came from vision LLM.
+- Then drop one level (high → medium → low, floor at low) per missing scored dim for the recommended size.
 
 ## Explanations (mandatory)
 
