@@ -1,0 +1,29 @@
+{
+  "id": "00000000-0000-4000-8000-000000000001",
+  "placeholder": true,
+  "sourceUrl": null,
+  "retailer": null,
+  "brand": null,
+  "name": "Placeholder crew tee",
+  "category": "top",
+  "imageUrls": [],
+  "primaryImageUrl": null,
+  "primaryColor": "white",
+  "priceCents": 2500,
+  "currency": "USD",
+  "fitType": "regular",
+  "stretch": "low",
+  "chartType": "garment",
+  "measurementBasis": "flat",
+  "sizeChart": {
+    "unit": "cm",
+    "rows": [
+      { "label": "S", "chest": 48, "shoulder": 43, "length": 69 },
+      { "label": "M", "chest": 51, "shoulder": 45, "length": 72 },
+      { "label": "L", "chest": 54, "shoulder": 47, "length": 74 },
+      { "label": "XL", "chest": 57, "shoulder": 49, "length": 76 }
+    ]
+  },
+  "extractionMethod": "fixture",
+  "extractionConfidence": null
+}

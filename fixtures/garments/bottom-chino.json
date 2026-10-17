@@ -1,0 +1,29 @@
+{
+  "id": "00000000-0000-4000-8000-000000000005",
+  "placeholder": true,
+  "sourceUrl": null,
+  "retailer": null,
+  "brand": null,
+  "name": "Placeholder chino",
+  "category": "bottom",
+  "imageUrls": [],
+  "primaryImageUrl": null,
+  "primaryColor": "khaki",
+  "priceCents": 5900,
+  "currency": "USD",
+  "fitType": "regular",
+  "stretch": "none",
+  "chartType": "garment",
+  "measurementBasis": "circumference",
+  "sizeChart": {
+    "unit": "cm",
+    "rows": [
+      { "label": "S", "waist": 76, "hip": 98, "inseam": 81 },
+      { "label": "M", "waist": 81, "hip": 103, "inseam": 81 },
+      { "label": "L", "waist": 86, "hip": 108, "inseam": 82 },
+      { "label": "XL", "waist": 91, "hip": 113, "inseam": 82 }
+    ]
+  },
+  "extractionMethod": "fixture",
+  "extractionConfidence": null
+}

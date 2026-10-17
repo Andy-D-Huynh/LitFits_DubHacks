@@ -124,6 +124,8 @@ create table order_lines (
 );
 ```
 
+Canonical SQL: `supabase/migrations/0001_init.sql`. Storage buckets `model-photos` and `renders` are private with no user policies; all access goes through server-issued signed URLs. Realtime is enabled on `capture_sessions` and `tryon_renders`.
+
 Enable row-level security on every table. `profiles` is keyed by `user_id` (from Supabase anonymous sign-in); other user-owned tables check ownership through `profile_id → profiles.user_id`. `garments` is a shared catalog: public read, service-role writes. See decisions in `build-plan.md`.
 
 ## Key shared types

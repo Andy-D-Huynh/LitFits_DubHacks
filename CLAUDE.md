@@ -51,6 +51,7 @@ Layout and data model: `docs/architecture.md`.
 - Build web: `pnpm --filter @fitmirror/web build`
 - Extension: `pnpm --filter @fitmirror/extension build`, then load `apps/extension/dist` unpacked at `chrome://extensions` (or `dev` for HMR on port 5173)
 - Env: copy `apps/web/.env.example` to `apps/web/.env.local`
+- DB: apply `supabase/migrations/*.sql` in order, then `pnpm --filter @fitmirror/web seed` loads `fixtures/garments/` (needs the service role key)
 - Demo mode: `DEMO_MODE=true` env, or `?demo=1` in the URL
 
 ## Owners

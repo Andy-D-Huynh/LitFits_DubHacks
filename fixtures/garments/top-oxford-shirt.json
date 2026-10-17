@@ -1,0 +1,29 @@
+{
+  "id": "00000000-0000-4000-8000-000000000002",
+  "placeholder": true,
+  "sourceUrl": null,
+  "retailer": null,
+  "brand": null,
+  "name": "Placeholder slim oxford shirt",
+  "category": "top",
+  "imageUrls": [],
+  "primaryImageUrl": null,
+  "primaryColor": "light blue",
+  "priceCents": 4900,
+  "currency": "USD",
+  "fitType": "slim",
+  "stretch": "none",
+  "chartType": "garment",
+  "measurementBasis": "circumference",
+  "sizeChart": {
+    "unit": "cm",
+    "rows": [
+      { "label": "S", "chest": 100, "waist": 92, "shoulder": 44, "sleeve": 63 },
+      { "label": "M", "chest": 106, "waist": 98, "shoulder": 46, "sleeve": 64 },
+      { "label": "L", "chest": 112, "waist": 104, "shoulder": 48, "sleeve": 65 },
+      { "label": "XL", "chest": 118, "waist": 110, "shoulder": 50, "sleeve": 66 }
+    ]
+  },
+  "extractionMethod": "fixture",
+  "extractionConfidence": null
+}

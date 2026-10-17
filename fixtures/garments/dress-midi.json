@@ -1,0 +1,29 @@
+{
+  "id": "00000000-0000-4000-8000-000000000008",
+  "placeholder": true,
+  "sourceUrl": null,
+  "retailer": null,
+  "brand": null,
+  "name": "Placeholder midi dress",
+  "category": "dress",
+  "imageUrls": [],
+  "primaryImageUrl": null,
+  "primaryColor": "black",
+  "priceCents": 8900,
+  "currency": "USD",
+  "fitType": "regular",
+  "stretch": "low",
+  "chartType": "body",
+  "measurementBasis": "circumference",
+  "sizeChart": {
+    "unit": "cm",
+    "rows": [
+      { "label": "XS", "chest": [78, 82], "waist": [60, 64], "hip": [86, 90] },
+      { "label": "S", "chest": [83, 87], "waist": [65, 69], "hip": [91, 95] },
+      { "label": "M", "chest": [88, 92], "waist": [70, 74], "hip": [96, 100] },
+      { "label": "L", "chest": [93, 98], "waist": [75, 80], "hip": [101, 106] }
+    ]
+  },
+  "extractionMethod": "fixture",
+  "extractionConfidence": null
+}
