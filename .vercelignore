@@ -1,0 +1,9 @@
+# Never upload local secrets; Vercel env vars are set in the project instead.
+**/.env
+**/.env.*
+!**/.env.example
+
+**/node_modules
+**/.next
+**/dist
+**/coverage
