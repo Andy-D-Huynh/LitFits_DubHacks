@@ -73,6 +73,7 @@ create table garments (
   size_chart jsonb,                       -- see SizeChart type
   extraction_method text,                 -- dom | llm_html | llm_vision | manual | fixture
   extraction_confidence numeric,
+  is_placeholder boolean not null default false,  -- true only for unverified fixture charts (0002)
   created_at timestamptz default now()
 );
 

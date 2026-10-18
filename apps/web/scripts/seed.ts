@@ -19,11 +19,11 @@ const dir = join(import.meta.dirname, '../../../fixtures/garments');
 const rows = readdirSync(dir)
   .filter((f) => f.endsWith('.json'))
   .map((f) => {
-    // `placeholder` has no column; fixtures stay the record of which rows are placeholders.
-    const { placeholder: _p, ...garment } = GarmentFixtureSchema.parse(
+    // Requires migration 0002 (garments.is_placeholder).
+    const { placeholder, ...garment } = GarmentFixtureSchema.parse(
       JSON.parse(readFileSync(join(dir, f), 'utf8')),
     );
-    return garmentToRow(garment);
+    return garmentToRow({ ...garment, isPlaceholder: placeholder });
   });
 
 const supabase = createClient(url, serviceKey, { auth: { persistSession: false } });
