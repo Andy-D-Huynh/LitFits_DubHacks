@@ -6,8 +6,9 @@ export default defineManifest({
   name: 'FitMirror',
   description: 'Persistent fitting figure. Reads the clothing product page you have open.',
   version: pkg.version,
-  permissions: ['activeTab', 'storage', 'sidePanel', 'scripting', 'tabs'],
-  host_permissions: ['https://*/*', 'http://*/*'],
+  // debugger: real clicks for add-to-bag. <all_urls>: screenshot for the Gemini fallback.
+  permissions: ['activeTab', 'storage', 'sidePanel', 'scripting', 'tabs', 'debugger'],
+  host_permissions: ['<all_urls>'],
   action: { default_title: 'Open FitMirror' },
   background: { service_worker: 'src/background/index.ts', type: 'module' },
   side_panel: { default_path: 'src/sidepanel/index.html' },

@@ -12,6 +12,21 @@ const API_BASE = 'http://localhost:3000';
 
 chrome.sidePanel.setPanelBehavior({ openPanelOnActionClick: true }).catch(console.error);
 
+/** Click at viewport CSS pixel (x, y) through the DevTools protocol, which pages see as a real mouse. */
+async function trustedClick(tabId: number, x: number, y: number) {
+  const target = { tabId };
+  await chrome.debugger.attach(target, '1.3');
+  try {
+    const mouse = (type: string, extra: Record<string, unknown> = {}) =>
+      chrome.debugger.sendCommand(target, 'Input.dispatchMouseEvent', { type, x, y, ...extra });
+    await mouse('mouseMoved');
+    await mouse('mousePressed', { button: 'left', buttons: 1, clickCount: 1 });
+    await mouse('mouseReleased', { button: 'left', buttons: 0, clickCount: 1 });
+  } finally {
+    await chrome.debugger.detach(target).catch(() => {});
+  }
+}
+
 chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
   if (message?.type === 'fitmirror:garment-added') {
     void chrome.runtime.sendMessage({ type: 'fitmirror:storage-updated' }).catch(() => {});
@@ -160,6 +175,36 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
     return true;
   }
 
+  // A real (isTrusted) click for stores that ignore script-dispatched events.
+  if (message?.type === 'fitmirror:trusted-click' && typeof message.x === 'number' && typeof message.y === 'number') {
+    const tabId = _sender.tab?.id;
+    if (tabId == null) {
+      sendResponse({ ok: false });
+      return false;
+    }
+    void trustedClick(tabId, message.x, message.y)
+      .then(() => sendResponse({ ok: true }))
+      .catch((err) => {
+        console.warn('[FitMirror Background] Trusted click failed:', err?.message);
+        sendResponse({ ok: false });
+      });
+    return true;
+  }
+
+  if (message?.type === 'fitmirror:capture-tab') {
+    const tab = _sender.tab;
+    // captureVisibleTab only sees the window's active tab; anything else would be the wrong page.
+    if (!tab?.active || tab.windowId == null) {
+      sendResponse({ ok: false });
+      return false;
+    }
+    chrome.tabs
+      .captureVisibleTab(tab.windowId, { format: 'jpeg', quality: 70 })
+      .then((dataUrl) => sendResponse({ ok: true, dataUrl }))
+      .catch(() => sendResponse({ ok: false }));
+    return true;
+  }
+
   if (message?.type === 'fitmirror:locate-cart' && message.payload) {
     void (async () => {
       for (const base of ['http://localhost:3000', 'http://localhost:3001']) {
@@ -176,8 +221,8 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
           const data = await res.json();
           sendResponse(res.ok ? { ok: true, ...data } : { ok: false, error: data?.error });
           return;
-        } catch (err: any) {
-          console.warn(`[FitMirror Background] Cart locate via ${base} failed:`, err?.message);
+        } catch (err) {
+          console.warn(`[FitMirror Background] Cart locate via ${base} failed:`, (err as Error)?.message);
         }
       }
       sendResponse({ ok: false, error: 'Could not reach the FitMirror server.' });

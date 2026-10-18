@@ -90,6 +90,9 @@ export type GeneratedLook = {
   retailer?: string | null;
   category?: GarmentCategory;
   generatedAt: string;
+  /** What was worn in this image, so restoring it brings back the whole state. */
+  liked?: LikedGarment[];
+  slots?: OutfitSlots;
 };
 
 export type FigurePersist = {

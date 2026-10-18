@@ -3,6 +3,7 @@ import {
   applyTryOnResult,
   loadFigure,
   removeGarment,
+  restoreGeneratedLook,
   setModelPhoto,
   toggleCart,
 } from './storage';
@@ -55,6 +56,36 @@ describe('storage garment management', () => {
     // Since no garments remain, avatarImageUrl resets to null so it falls back to modelImage
     expect(afterRemove.avatarImageUrl).toBeNull();
     expect(afterRemove.modelImage).toBe('data:image/jpeg;base64,basephoto');
+  });
+
+  it('restores a saved look with the clothes that were worn in it', async () => {
+    await setModelPhoto('data:image/jpeg;base64,basephoto', null);
+    const item = (id: string, name: string) => ({
+      id,
+      productUrl: `https://shop.test/${id}`,
+      name,
+      garmentImageUrl: `https://shop.test/${id}.jpg`,
+      retailer: 'Shop',
+      addedAt: new Date().toISOString(),
+      inCart: false,
+    });
+
+    await applyTryOnResult('https://cdn.test/look-1.png', item('tee', 'Tee'), 'top');
+    await applyTryOnResult('https://cdn.test/look-2.png', item('jeans', 'Jeans'), 'bottom');
+    await toggleCart('tee', true);
+
+    const firstLook = (await loadFigure()).lookHistory.find(
+      (l) => l.imageUrl === 'https://cdn.test/look-1.png',
+    )!;
+    const restored = await restoreGeneratedLook(firstLook.id);
+
+    expect(restored.avatarImageUrl).toBe('https://cdn.test/look-1.png');
+    expect(restored.liked.map((i) => i.name)).toEqual(['Tee']);
+    expect(restored.liked[0]?.inCart).toBe(true);
+    expect(restored.slots.top?.name).toBe('Tee');
+    expect(restored.slots.bottom).toBeNull();
+    // Both looks stay saved.
+    expect(restored.lookHistory).toHaveLength(2);
   });
 
   it('marks and consumes pending cart additions reliably', async () => {

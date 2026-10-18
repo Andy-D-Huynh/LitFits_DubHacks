@@ -267,6 +267,8 @@ export async function applyTryOnResult(
     slots = applyWear(slots, worn);
   }
 
+  const nextLiked = [liked, ...without].slice(0, 100);
+
   // Cache generated look in lookHistory so the user can look back anytime even after remove
   const newLook: GeneratedLook = {
     id: crypto.randomUUID(),
@@ -277,6 +279,8 @@ export async function applyTryOnResult(
     retailer: liked.retailer,
     category,
     generatedAt: new Date().toISOString(),
+    liked: nextLiked,
+    slots,
   };
   const prevLooks = current.lookHistory || [];
   const withoutDup = prevLooks.filter((l) => l.imageUrl !== avatarImageUrl);
@@ -288,20 +292,30 @@ export async function applyTryOnResult(
     avatarImageUrl,
     avatarMinimized: false,
     visible: true,
-    liked: [liked, ...without].slice(0, 100),
+    liked: nextLiked,
     lookHistory,
   };
   await saveFigure(next);
   return next;
 }
 
-/** Restore a previously generated look as the active avatar image. */
+/**
+ * Restore a previously generated look as the active avatar image, along with
+ * the clothes worn in it, so the next try-on continues from that state.
+ */
 export async function restoreGeneratedLook(lookId: string): Promise<FigurePersist> {
   const current = await loadFigure();
   const look = current.lookHistory?.find((l) => l.id === lookId);
   if (!look) return current;
+  // Looks saved before snapshots existed only restore the image.
+  const inCart = new Set(current.liked.filter((i) => i.inCart).map((i) => i.productUrl));
+  const liked = look.liked
+    ? likedFrom(look.liked).map((i) => ({ ...i, inCart: i.inCart || inCart.has(i.productUrl) }))
+    : current.liked;
   const next: FigurePersist = {
     ...current,
+    liked,
+    slots: look.slots ? normalizeSlots(look.slots) : current.slots,
     avatarImageUrl: look.imageUrl,
     avatarMinimized: false,
     visible: true,

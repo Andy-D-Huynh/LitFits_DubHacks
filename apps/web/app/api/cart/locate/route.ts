@@ -10,6 +10,13 @@ const BodySchema = z.object({
   url: z.string().url(),
   productName: z.string().max(200).default(''),
   candidates: z.array(CandidateSchema).min(1).max(300),
+  viewport: z.object({ width: z.number(), height: z.number() }).optional(),
+  screenshot: z
+    .string()
+    .max(4_000_000)
+    .regex(/^data:image\/(jpeg|png|webp);base64,/)
+    .optional(),
+  note: z.string().max(500).optional(),
 });
 
 export async function POST(req: Request) {
