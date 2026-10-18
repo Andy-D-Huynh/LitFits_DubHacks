@@ -93,6 +93,10 @@ export async function extractOutline(imageSrc: string): Promise<SilhouetteResult
     })),
   );
 
+  if (outline.length < 3) {
+    throw new Error('Could not find a person in that photo');
+  }
+
   const outW = 280;
   const outH = 480;
   const out = document.createElement('canvas');

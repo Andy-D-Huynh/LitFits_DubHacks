@@ -1,5 +1,6 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { extractOutline } from '../lib/outline';
+import { fileToModelImage } from '../lib/photo';
 import {
   dismissFigure,
   loadFigure,
@@ -27,6 +28,7 @@ export function App() {
   const [data, setData] = useState<FigurePersist | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const fileRef = useRef<HTMLInputElement>(null);
 
   async function refresh() {
     setData(await loadFigure());
@@ -48,21 +50,24 @@ export function App() {
     setBusy(true);
     setError(null);
     try {
-      const dataUrl = await new Promise<string>((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onload = () =>
-          typeof reader.result === 'string'
-            ? resolve(reader.result)
-            : reject(new Error('read failed'));
-        reader.onerror = () => reject(new Error('read failed'));
-        reader.readAsDataURL(file);
-      });
-      const silhouette = await extractOutline(dataUrl);
+      const dataUrl = await fileToModelImage(file);
+      let silhouette = null;
+      try {
+        silhouette = await extractOutline(dataUrl);
+      } catch {
+        silhouette = null;
+      }
       setData(await setModelPhoto(dataUrl, silhouette));
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Could not create outline');
+      const message = e instanceof Error ? e.message : 'Could not save that photo';
+      setError(
+        message.includes('QUOTA')
+          ? 'That photo is too large to store. Try a smaller JPEG.'
+          : message,
+      );
     } finally {
       setBusy(false);
+      if (fileRef.current) fileRef.current.value = '';
     }
   }
 
@@ -78,41 +83,34 @@ export function App() {
         generates a new image with Fashn. Each piece’s link is saved for the cart.
       </p>
 
-      <ActivePage onWorn={() => void refresh()} />
-
-      {data.avatarImageUrl ? (
-        <img
-          src={data.avatarImageUrl}
-          alt="Latest try-on"
-          style={{ width: '100%', borderRadius: 8, background: '#e8eef3', marginBottom: 10 }}
-        />
-      ) : null}
-
-      <OutlineView data={data} />
-
-      <div style={{ display: 'flex', gap: 8, marginTop: 10, flexWrap: 'wrap' }}>
-        <label
+      <div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
+        <button
+          type="button"
+          onClick={() => fileRef.current?.click()}
+          disabled={busy}
           style={{
             flex: 1,
             textAlign: 'center',
             background: '#0b6e6e',
             color: '#fff',
+            border: 'none',
             borderRadius: 6,
-            padding: '8px 10px',
-            fontSize: 12,
+            padding: '10px 12px',
+            fontSize: 13,
             fontWeight: 700,
             cursor: 'pointer',
           }}
         >
-          {busy ? 'Tracing…' : data.silhouette ? 'Recapture photo' : 'Upload your photo'}
-          <input
-            type="file"
-            accept="image/*,.heic,.heif"
-            style={{ display: 'none' }}
-            onChange={(e) => void onUpload(e.target.files?.[0])}
-          />
-        </label>
-        {data.silhouette ? (
+          {busy ? 'Saving photo…' : data.modelImage ? 'Replace photo' : 'Upload your photo'}
+        </button>
+        <input
+          ref={fileRef}
+          type="file"
+          accept="image/jpeg,image/png,image/webp,image/gif"
+          style={{ position: 'fixed', left: 0, top: 0, width: 1, height: 1, opacity: 0 }}
+          onChange={(e) => void onUpload(e.target.files?.[0])}
+        />
+        {data.modelImage ? (
           <button
             type="button"
             style={{
@@ -130,6 +128,18 @@ export function App() {
         ) : null}
       </div>
       {error ? <p style={{ color: '#b91c1c', fontSize: 12 }}>{error}</p> : null}
+
+      {data.avatarImageUrl || data.modelImage ? (
+        <img
+          src={data.avatarImageUrl || data.modelImage || ''}
+          alt="Your figure"
+          style={{ width: '100%', borderRadius: 8, background: '#e8eef3', marginBottom: 10 }}
+        />
+      ) : (
+        <OutlineView data={data} />
+      )}
+
+      <ActivePage onWorn={() => void refresh()} />
 
       <section style={{ marginTop: 14 }}>
         <p
