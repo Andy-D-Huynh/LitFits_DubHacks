@@ -5,6 +5,119 @@ import type { GarmentCategory, WornGarment } from './types';
 
 export type { PageProduct };
 
+function findActiveColorName(): string | null {
+  // 1. Swatch and selector attributes
+  const swatchSelectors = [
+    '[data-testid*="color" i] [class*="selected" i]',
+    '[data-testid*="color" i] [aria-checked="true"]',
+    '[class*="color" i] [class*="selected" i]',
+    '[class*="color" i] [class*="active" i]',
+    '[class*="swatch" i][class*="selected" i]',
+    '[class*="swatch" i][class*="active" i]',
+    'button[aria-label*="color" i][aria-checked="true"]',
+    'button[aria-label*="colour" i][aria-checked="true"]',
+    'input[name*="color" i]:checked + label',
+    'input[name*="colour" i]:checked + label',
+    '.selected-color',
+    '.active-color',
+    '[data-selected-color]',
+  ];
+
+  for (const sel of swatchSelectors) {
+    const el = document.querySelector<HTMLElement>(sel);
+    if (el) {
+      const val =
+        el.getAttribute('data-color') ||
+        el.getAttribute('data-selected-color') ||
+        el.getAttribute('aria-label') ||
+        el.getAttribute('title') ||
+        el.innerText ||
+        el.textContent;
+      if (val && val.trim().length >= 2 && val.trim().length <= 40) {
+        return val.replace(/^(color|colour)\s*[:：]\s*/i, '').trim();
+      }
+    }
+  }
+
+  // 2. Visible "Color: Red" labels on the page
+  const textElements = Array.from(document.querySelectorAll<HTMLElement>('p, span, div, h2, h3, label'));
+  for (const el of textElements) {
+    if (el.children.length > 2) continue;
+    const txt = (el.innerText || el.textContent || '').trim();
+    const match = txt.match(/^(?:color|colour)\s*[:：]\s*([a-zA-Z0-9\s/-]{2,30})$/i);
+    if (match && match[1]) {
+      return match[1].trim();
+    }
+  }
+
+  return null;
+}
+
+function findActiveProductImage(): string | null {
+  const skipPattern = /(sprite|icon|logo|pixel|avatar|badge|placeholder)/i;
+
+  // 1. Look for active slide / main image in product galleries
+  const activeSelectors = [
+    // Swiper / Slick / standard slider active classes
+    '.swiper-slide-active img',
+    '.swiper-slide-duplicate-active img',
+    '.slick-current img',
+    '.slick-active img',
+    '[aria-roledescription="slide"][aria-hidden="false"] img',
+    '[data-testid*="active-slide"] img',
+    // Main gallery viewers
+    '[data-testid*="main-image"] img',
+    '[data-testid*="hero-image"] img',
+    '[data-testid*="product-image"] img',
+    '.product__media img',
+    '.gallery__main img',
+    '.product-single__photo img',
+    '.product-main-slide img',
+    '.media-gallery__viewer img',
+    '#main-product-image',
+    'img[data-main-image]',
+    'img[data-zoom-image]',
+  ];
+
+  for (const sel of activeSelectors) {
+    const el = document.querySelector<HTMLImageElement>(sel);
+    const src = el?.currentSrc || el?.src;
+    if (src && !src.startsWith('data:') && !skipPattern.test(src)) {
+      const rect = el.getBoundingClientRect();
+      if (rect.width >= 120 && rect.height >= 120) {
+        return src;
+      }
+    }
+  }
+
+  // 2. Fallback: Find the largest visible image in the product presentation area
+  const allImgs = Array.from(document.querySelectorAll<HTMLImageElement>('img'));
+  let bestSrc: string | null = null;
+  let bestScore = 0;
+
+  for (const img of allImgs) {
+    if (img.closest('#fitmirror-avatar-root') || img.id === 'fitmirror-tryon-badge') continue;
+    const src = img.currentSrc || img.src;
+    if (!src || src.startsWith('data:') || skipPattern.test(src) || skipPattern.test(img.alt)) continue;
+
+    const rect = img.getBoundingClientRect();
+    if (rect.width < 140 || rect.height < 140) continue;
+    // Product main photos are typically in top 1200px of page and visible
+    if (rect.bottom <= 0 || rect.top >= Math.max(window.innerHeight * 1.5, 1200)) continue;
+    if (rect.right <= 0 || rect.left >= window.innerWidth) continue;
+
+    const area = rect.width * rect.height;
+    // Score based on area and proximity to top
+    const score = area / (1 + Math.max(0, rect.top));
+    if (score > bestScore) {
+      bestScore = score;
+      bestSrc = src;
+    }
+  }
+
+  return bestSrc;
+}
+
 function snapshotFromDocument(): PageSnapshot {
   const jsonLdTexts: string[] = [];
   for (const script of document.querySelectorAll('script[type="application/ld+json"]')) {
@@ -31,12 +144,17 @@ function snapshotFromDocument(): PageSnapshot {
     height: img.naturalHeight || img.height,
   }));
 
+  const activeImageUrl = findActiveProductImage();
+  const activeColor = findActiveColorName();
+
   return {
     url: location.href,
     title: document.title,
     jsonLdTexts,
     metas,
     images,
+    activeImageUrl,
+    activeColor,
   };
 }
 
@@ -136,10 +254,26 @@ function cutoutFromDataUrl(dataUrl: string): Promise<string | null> {
   });
 }
 
-/** JPEG (or fetched) product photo suitable to send as garment_image. */
+/** Web URL or data URI suitable to send as garment_image to the try-on API. */
 export async function captureProductImage(url: string | null): Promise<string | null> {
   if (!url) return null;
-  return toDataUrl(url);
+  // If already an absolute http(s) URL, use it directly (fast, no canvas taint, no CORS failure)
+  if (/^https?:\/\//i.test(url)) {
+    return url;
+  }
+  if (url.startsWith('data:')) {
+    return url;
+  }
+  try {
+    const full = new URL(url, location.href).href;
+    if (/^https?:\/\//i.test(full)) return full;
+  } catch {}
+
+  // Fallback to toDataUrl with a 3s timeout so it never hangs
+  return Promise.race([
+    toDataUrl(url),
+    new Promise<null>((resolve) => setTimeout(() => resolve(null), 3000)),
+  ]);
 }
 
 export async function buildWornGarment(

@@ -14,13 +14,14 @@ export type PageMeta = {
   content: string;
 };
 
-/** What the content script can see on a retail page. Parsing itself is pure. */
 export type PageSnapshot = {
   url: string;
   title: string;
   jsonLdTexts: string[];
   metas: PageMeta[];
   images: PageImage[];
+  activeImageUrl?: string | null;
+  activeColor?: string | null;
 };
 
 export type PageProduct = {
@@ -141,6 +142,7 @@ export function parsePageProduct(snapshot: PageSnapshot): PageProduct {
     metaContent(snapshot.metas, 'og:site_name');
 
   const imageUrl =
+    snapshot.activeImageUrl ||
     firstImageUrl(product?.image) ||
     metaContent(snapshot.metas, 'og:image') ||
     metaContent(snapshot.metas, 'twitter:image') ||
@@ -151,13 +153,15 @@ export function parsePageProduct(snapshot: PageSnapshot): PageProduct {
     metaContent(snapshot.metas, 'og:description') ||
     '';
 
-  const color = typeof product?.color === 'string' && product.color.trim() ? product.color.trim() : null;
+  const color =
+    snapshot.activeColor ||
+    (typeof product?.color === 'string' && product.color.trim() ? product.color.trim() : null);
 
   return {
     name: name.slice(0, 160),
     brand: brand?.slice(0, 80) ?? null,
     imageUrl,
-    category: guessCategory(`${name} ${description}`),
+    category: guessCategory(name, snapshot.url, description),
     sourceUrl: snapshot.url,
     retailer: retailerFromUrl(snapshot.url),
     price: product ? readPrice(product.offers) : null,

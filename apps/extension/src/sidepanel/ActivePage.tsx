@@ -119,145 +119,128 @@ export function ActivePage({ onWorn }: { onWorn: () => void }) {
 
   const product = state.status === 'ready' ? state.product : null;
 
+  if (!product) {
+    return (
+      <div
+        style={{
+          fontSize: 11,
+          color: '#94a3b8',
+          textAlign: 'center',
+          padding: '8px 12px',
+          background: '#f8fafc',
+          borderRadius: 10,
+          border: '1px dashed #cbd5e1',
+          marginBottom: 12,
+        }}
+      >
+        Open a product page on any store to try it on
+      </div>
+    );
+  }
+
   return (
     <section
       style={{
         marginBottom: 14,
         padding: 10,
-        border: '1px solid #c5ced6',
-        borderRadius: 8,
-        background: '#f7f9fb',
+        border: '1px solid #e2e8f0',
+        borderRadius: 12,
+        background: '#ffffff',
       }}
     >
-      <p
-        style={{
-          fontSize: 11,
-          textTransform: 'uppercase',
-          letterSpacing: '0.12em',
-          color: '#5c6b76',
-          margin: '0 0 6px',
-        }}
-      >
-        Page you have open
-      </p>
-      {state.status === 'loading' ? (
-        <p style={{ fontSize: 12, margin: 0 }}>Reading the active tab…</p>
-      ) : null}
-      {state.status === 'empty' || state.status === 'error' ? (
-        <p style={{ fontSize: 12, margin: 0, color: '#5c6b76', lineHeight: 1.4 }}>
-          {state.detail}
-        </p>
-      ) : null}
-      {product ? (
-        <div>
-          <p style={{ margin: '0 0 4px', fontSize: 13, fontWeight: 700 }}>{product.name}</p>
-          <p style={{ margin: '0 0 8px', fontSize: 11, color: '#5c6b76' }}>
-            {product.retailer ?? 'this site'}
-            {product.brand ? ` · ${product.brand}` : ''}
-            {product.price ? ` · ${product.price.amount} ${product.price.currency}` : ''}
-          </p>
-          {product.imageUrl ? (
-            <img
-              src={product.imageUrl}
-              alt=""
-              style={{
-                width: '100%',
-                height: 120,
-                objectFit: 'contain',
-                background: '#e8eef3',
-                borderRadius: 6,
-              }}
-            />
-          ) : (
-            <p style={{ fontSize: 12, color: '#b91c1c' }}>No product image on this page yet.</p>
-          )}
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginTop: 8 }}>
-            {CATEGORIES.map((c) => (
-              <button
-                key={c}
-                type="button"
-                onClick={() => setCategory(c)}
-                style={{
-                  fontSize: 10,
-                  textTransform: 'uppercase',
-                  borderRadius: 4,
-                  border: '1px solid #c5ced6',
-                  padding: '4px 6px',
-                  cursor: 'pointer',
-                  background: category === c ? '#0b6e6e' : '#fff',
-                  color: category === c ? '#fff' : '#142028',
-                }}
-              >
-                {c}
-              </button>
-            ))}
-          </div>
-          <button
-            type="button"
-            disabled={busy || !product.imageUrl}
-            onClick={() => void wear()}
+      <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
+        {product.imageUrl ? (
+          <img
+            src={product.imageUrl}
+            alt=""
             style={{
-              marginTop: 8,
-              width: '100%',
-              border: 'none',
-              borderRadius: 6,
-              padding: 8,
-              fontSize: 12,
+              width: 50,
+              height: 50,
+              objectFit: 'cover',
+              background: '#f1f5f9',
+              borderRadius: 8,
+              flexShrink: 0,
+            }}
+          />
+        ) : null}
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div
+            style={{
+              fontSize: 9,
               fontWeight: 700,
-              background: '#0b6e6e',
-              color: '#fff',
-              cursor: 'pointer',
+              textTransform: 'uppercase',
+              letterSpacing: '0.05em',
+              color: '#64748b',
             }}
           >
-            {busy ? 'Generating…' : 'Try this page on'}
-          </button>
+            {product.retailer ?? 'Store'}
+          </div>
+          <div
+            style={{
+              fontSize: 12,
+              fontWeight: 600,
+              color: '#0f172a',
+              whiteSpace: 'nowrap',
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
+            }}
+          >
+            {product.name}
+          </div>
+          {product.price ? (
+            <div style={{ fontSize: 11, color: '#64748b' }}>
+              {product.price.amount} {product.price.currency}
+            </div>
+          ) : null}
         </div>
-      ) : null}
+      </div>
 
-      <form onSubmit={(e) => void openRetail(e)} style={{ display: 'flex', gap: 6, marginTop: 10 }}>
-        <input
-          value={url}
-          onChange={(e) => setUrl(e.target.value)}
-          placeholder="https://store.example/product"
-          style={{
-            flex: 1,
-            minWidth: 0,
-            border: '1px solid #c5ced6',
-            borderRadius: 6,
-            padding: '6px 8px',
-            fontSize: 12,
-          }}
-        />
-        <button
-          type="submit"
-          style={{
-            border: '1px solid #c5ced6',
-            borderRadius: 6,
-            background: '#fff',
-            fontSize: 12,
-            cursor: 'pointer',
-          }}
-        >
-          Open
-        </button>
-      </form>
+      <div style={{ display: 'flex', gap: 4, marginTop: 8, overflowX: 'auto', paddingBottom: 2 }}>
+        {CATEGORIES.map((c) => (
+          <button
+            key={c}
+            type="button"
+            onClick={() => setCategory(c)}
+            style={{
+              fontSize: 10,
+              fontWeight: 600,
+              textTransform: 'capitalize',
+              borderRadius: 999,
+              border: category === c ? 'none' : '1px solid #e2e8f0',
+              padding: '3px 8px',
+              cursor: 'pointer',
+              background: category === c ? '#0f172a' : '#f8fafc',
+              color: category === c ? '#ffffff' : '#64748b',
+              flexShrink: 0,
+            }}
+          >
+            {c}
+          </button>
+        ))}
+      </div>
+
       <button
         type="button"
-        onClick={() => void readTab()}
+        disabled={busy || !product.imageUrl}
+        onClick={() => void wear()}
         style={{
-          marginTop: 6,
+          marginTop: 8,
+          width: '100%',
           border: 'none',
-          background: 'none',
-          padding: 0,
+          borderRadius: 8,
+          padding: '7px 12px',
           fontSize: 11,
-          color: '#0b6e6e',
+          fontWeight: 600,
+          background: '#0f172a',
+          color: '#ffffff',
           cursor: 'pointer',
-          textDecoration: 'underline',
+          opacity: busy || !product.imageUrl ? 0.6 : 1,
         }}
       >
-        Re-read this tab
+        {busy ? 'Styling…' : 'Try on'}
       </button>
-      {note ? <p style={{ fontSize: 11, margin: '6px 0 0', color: '#142028' }}>{note}</p> : null}
+
+      {note ? <p style={{ fontSize: 11, margin: '6px 0 0', color: '#64748b' }}>{note}</p> : null}
     </section>
   );
 }

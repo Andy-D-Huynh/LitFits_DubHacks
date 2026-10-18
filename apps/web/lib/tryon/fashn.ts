@@ -34,7 +34,7 @@ export async function renderFashnTryOn(input: FashnTryOnInput): Promise<string> 
       garment_photo_type: 'auto',
       moderation_level: 'permissive',
       num_samples: 1,
-      segmentation_free: true,
+      segmentation_free: false,
       output_format: 'png',
     },
   });

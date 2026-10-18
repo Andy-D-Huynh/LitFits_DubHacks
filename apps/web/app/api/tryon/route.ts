@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import { rememberLikedLink } from '@/lib/cart/liked-garments';
-import { fashnCategory, renderFashnTryOn } from '@/lib/tryon/fashn';
+import { renderFluxTryOn, type FitStyle } from '@/lib/tryon/flux-vto';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -14,6 +14,8 @@ const BodySchema = z.object({
   name: z.string().min(1).max(200),
   retailer: z.string().max(80).nullable().optional(),
   category: z.string().max(40).optional(),
+  fit: z.enum(['regular', 'baggy', 'tight', 'oversized', 'cropped']).optional(),
+  color: z.string().max(80).nullable().optional(),
 });
 
 export async function POST(req: Request) {
@@ -31,10 +33,13 @@ export async function POST(req: Request) {
 
   const body = parsed.data;
   try {
-    const imageUrl = await renderFashnTryOn({
+    const imageUrl = await renderFluxTryOn({
       modelImage: body.modelImage,
       garmentImage: body.garmentImage,
-      category: fashnCategory(body.category),
+      name: body.name,
+      category: body.category,
+      fit: body.fit as FitStyle | undefined,
+      color: body.color,
     });
     const cart = await rememberLikedLink({
       id: crypto.randomUUID(),

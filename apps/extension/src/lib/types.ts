@@ -59,6 +59,17 @@ export type SavedOutfit = {
   sourceUrls: string[];
 };
 
+/** A product the user browsed. Auto-saved when visiting a product page. */
+export type BrowsedProduct = {
+  id: string;
+  productUrl: string;
+  name: string;
+  imageUrl: string | null;
+  retailer: string | null;
+  category: GarmentCategory;
+  visitedAt: string;
+};
+
 /** A product the user tried on. The link is what goes in the shopping cart. */
 export type LikedGarment = {
   id: string;
@@ -67,6 +78,18 @@ export type LikedGarment = {
   garmentImageUrl: string;
   retailer: string | null;
   addedAt: string;
+  inCart?: boolean;
+};
+
+export type GeneratedLook = {
+  id: string;
+  imageUrl: string;
+  garmentName: string;
+  garmentImageUrl?: string | null;
+  productUrl: string;
+  retailer?: string | null;
+  category?: GarmentCategory;
+  generatedAt: string;
 };
 
 export type FigurePersist = {
@@ -82,6 +105,10 @@ export type FigurePersist = {
   /** Minimized corner avatar. The figure is still saved. */
   avatarMinimized: boolean;
   liked: LikedGarment[];
+  /** Products the user visited — auto-cached browsing history. */
+  browsedProducts: BrowsedProduct[];
+  /** Cache of all generated try-on images so the user can look back at them anytime. */
+  lookHistory: GeneratedLook[];
 };
 
 export const STORAGE_KEY = 'fitmirror-outline-figure';

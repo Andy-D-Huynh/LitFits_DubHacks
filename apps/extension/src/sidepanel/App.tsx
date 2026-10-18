@@ -4,24 +4,24 @@ import { fileToModelImage } from '../lib/photo';
 import {
   dismissFigure,
   loadFigure,
-  saveFigure,
+  markAllInCart,
+  removeGarment,
   setModelPhoto,
+  toggleCart,
 } from '../lib/storage';
-import type { FigurePersist, OutfitSlots } from '../lib/types';
+import type { FigurePersist, LikedGarment } from '../lib/types';
 import { ActivePage } from './ActivePage';
 import { OutlineView } from './OutlineView';
 
-function slotEntries(slots: OutfitSlots) {
-  return (
-    [
-      ['dress', slots.dress],
-      ['top', slots.top],
-      ['bottom', slots.bottom],
-      ['footwear', slots.footwear],
-      ['outerwear', slots.outerwear],
-      ['accessory', slots.accessory],
-    ] as const
-  ).filter(([, g]) => g);
+function cleanSiteName(item: LikedGarment): string {
+  if (item.retailer && item.retailer.trim()) return item.retailer.trim();
+  try {
+    const host = new URL(item.productUrl).hostname.replace(/^www\./, '');
+    const parts = host.split('.');
+    return (parts.length >= 2 && parts[0]) ? parts[0] : host;
+  } catch {
+    return 'Store';
+  }
 }
 
 export function App() {
@@ -59,10 +59,10 @@ export function App() {
       }
       setData(await setModelPhoto(dataUrl, silhouette));
     } catch (e) {
-      const message = e instanceof Error ? e.message : 'Could not save that photo';
+      const message = e instanceof Error ? e.message : 'Could not save photo';
       setError(
         message.includes('QUOTA')
-          ? 'That photo is too large to store. Try a smaller JPEG.'
+          ? 'Photo is too large to store. Try a smaller image.'
           : message,
       );
     } finally {
@@ -72,292 +72,360 @@ export function App() {
   }
 
   if (!data) {
-    return <main style={{ padding: 16, fontFamily: 'system-ui' }}>Loading…</main>;
+    return (
+      <main style={{ padding: 16, fontFamily: 'system-ui', color: '#64748b', fontSize: 13 }}>
+        Loading…
+      </main>
+    );
   }
 
+  const look = data.avatarImageUrl || data.modelImage;
+
   return (
-    <main style={{ fontFamily: 'system-ui, sans-serif', padding: 14, color: '#142028' }}>
-      <h1 style={{ fontSize: 18, margin: '0 0 4px' }}>FitMirror</h1>
-      <p style={{ margin: '0 0 12px', fontSize: 12, color: '#5c6b76', lineHeight: 1.4 }}>
-        Your photo stays in the bottom corner of every shopping tab. Click Try this on and the server
-        generates a new image with Fashn. Each piece’s link is saved for the cart.
-      </p>
-
-      <div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
-        <button
-          type="button"
-          onClick={() => fileRef.current?.click()}
-          disabled={busy}
-          style={{
-            flex: 1,
-            textAlign: 'center',
-            background: '#0b6e6e',
-            color: '#fff',
-            border: 'none',
-            borderRadius: 6,
-            padding: '10px 12px',
-            fontSize: 13,
-            fontWeight: 700,
-            cursor: 'pointer',
-          }}
-        >
-          {busy ? 'Saving photo…' : data.modelImage ? 'Replace photo' : 'Upload your photo'}
-        </button>
-        <input
-          ref={fileRef}
-          type="file"
-          accept="image/jpeg,image/png,image/webp,image/gif"
-          style={{ position: 'fixed', left: 0, top: 0, width: 1, height: 1, opacity: 0 }}
-          onChange={(e) => void onUpload(e.target.files?.[0])}
-        />
-        {data.modelImage ? (
+    <main
+      style={{
+        fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+        padding: 14,
+        color: '#0f172a',
+        maxWidth: 360,
+        margin: '0 auto',
+      }}
+    >
+      {/* Sleek Minimal Header */}
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          marginBottom: 12,
+        }}
+      >
+        <span style={{ fontSize: 13, fontWeight: 700, color: '#0f172a' }}>Avatar</span>
+        <div style={{ display: 'flex', gap: 6 }}>
           <button
             type="button"
+            onClick={() => fileRef.current?.click()}
+            disabled={busy}
             style={{
-              border: '1px solid #c5ced6',
-              borderRadius: 6,
-              padding: '8px 10px',
-              fontSize: 12,
-              background: '#fff',
-              cursor: 'pointer',
-            }}
-            onClick={() => void dismissFigure().then(setData)}
-          >
-            Dismiss
-          </button>
-        ) : null}
-      </div>
-      {error ? <p style={{ color: '#b91c1c', fontSize: 12 }}>{error}</p> : null}
-
-      {data.avatarImageUrl || data.modelImage ? (
-        <img
-          src={data.avatarImageUrl || data.modelImage || ''}
-          alt="Your figure"
-          style={{ width: '100%', borderRadius: 8, background: '#e8eef3', marginBottom: 10 }}
-        />
-      ) : (
-        <OutlineView data={data} />
-      )}
-
-      <ActivePage onWorn={() => void refresh()} />
-
-      <section style={{ marginTop: 14 }}>
-        <p
-          style={{
-            fontSize: 11,
-            textTransform: 'uppercase',
-            letterSpacing: '0.12em',
-            color: '#5c6b76',
-            margin: '0 0 6px',
-          }}
-        >
-          Cart links
-        </p>
-        {data.liked.length === 0 ? (
-          <p style={{ fontSize: 12, color: '#5c6b76', margin: '0 0 12px' }}>
-            Try a piece on and its product link is saved here.
-          </p>
-        ) : (
-          <ul style={{ listStyle: 'none', padding: 0, margin: '0 0 12px', fontSize: 12 }}>
-            {data.liked.map((item) => (
-              <li key={item.id} style={{ marginBottom: 6 }}>
-                <a href={item.productUrl} target="_blank" rel="noreferrer" style={{ color: '#0b6e6e' }}>
-                  {item.name}
-                </a>
-                {item.retailer ? <span style={{ color: '#5c6b76' }}> · {item.retailer}</span> : null}
-              </li>
-            ))}
-          </ul>
-        )}
-        <p
-          style={{
-            fontSize: 11,
-            textTransform: 'uppercase',
-            letterSpacing: '0.12em',
-            color: '#5c6b76',
-            margin: '0 0 6px',
-          }}
-        >
-          Wearing
-        </p>
-        {slotEntries(data.slots).length === 0 ? (
-          <p style={{ fontSize: 12, color: '#5c6b76', margin: 0 }}>
-            Open a product page, then wear it from the panel above. You can also use Add to Figure
-            on the page itself.
-          </p>
-        ) : (
-          <ul style={{ listStyle: 'none', padding: 0, margin: 0, fontSize: 12 }}>
-            {slotEntries(data.slots).map(([slot, g]) => (
-              <li
-                key={slot}
-                style={{
-                  display: 'flex',
-                  justifyContent: 'space-between',
-                  gap: 8,
-                  marginBottom: 6,
-                }}
-              >
-                <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                  {slot} · {g!.name}
-                  {g!.retailer ? ` (${g!.retailer})` : ''}
-                </span>
-                <button
-                  type="button"
-                  style={{ fontSize: 11, cursor: 'pointer' }}
-                  onClick={() => {
-                    void (async () => {
-                      const next = { ...data, slots: { ...data.slots, [slot]: null } };
-                      await saveFigure(next);
-                      setData(next);
-                    })();
-                  }}
-                >
-                  Remove
-                </button>
-              </li>
-            ))}
-          </ul>
-        )}
-        {slotEntries(data.slots).length > 0 ? (
-          <button
-            type="button"
-            style={{
-              marginTop: 6,
-              width: '100%',
-              border: '1px solid #c5ced6',
-              borderRadius: 6,
-              padding: 8,
-              fontSize: 12,
-              background: '#fff',
-              cursor: 'pointer',
-            }}
-            onClick={() => {
-              void (async () => {
-                const next = {
-                  ...data,
-                  slots: {
-                    top: null,
-                    bottom: null,
-                    outerwear: null,
-                    dress: null,
-                    footwear: null,
-                    accessory: null,
-                  },
-                };
-                await saveFigure(next);
-                setData(next);
-              })();
-            }}
-          >
-            Clear clothes
-          </button>
-        ) : null}
-      </section>
-
-      {data.closet.length > 0 ? (
-        <section style={{ marginTop: 14 }}>
-          <p
-            style={{
+              background: '#0f172a',
+              color: '#ffffff',
+              border: 'none',
+              borderRadius: 999,
+              padding: '5px 12px',
               fontSize: 11,
-              textTransform: 'uppercase',
-              letterSpacing: '0.12em',
-              color: '#5c6b76',
-              margin: '0 0 6px',
+              fontWeight: 600,
+              cursor: 'pointer',
+              transition: 'opacity 0.15s',
             }}
           >
-            Closet (from any site)
-          </p>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6 }}>
-            {data.closet.slice(0, 8).map((g) => {
-              const img = g.imageDataUrl || g.primaryImageUrl;
-              return (
-                <button
-                  key={g.id}
-                  type="button"
-                  onClick={() => {
-                    void (async () => {
-                      const { wearOnFigure } = await import('../lib/storage');
-                      setData(await wearOnFigure(g));
-                    })();
-                  }}
-                  style={{
-                    border: '1px solid #c5ced6',
-                    borderRadius: 6,
-                    padding: 0,
-                    overflow: 'hidden',
-                    background: '#fff',
-                    cursor: 'pointer',
-                    textAlign: 'left',
-                  }}
-                >
-                  <div
-                    style={{
-                      height: 72,
-                      background: img
-                        ? `center/cover url(${img})`
-                        : '#d0d7de',
-                    }}
-                  />
-                  <div style={{ padding: '4px 6px', fontSize: 10 }}>
-                    <div
-                      style={{
-                        whiteSpace: 'nowrap',
-                        overflow: 'hidden',
-                        textOverflow: 'ellipsis',
-                        fontWeight: 600,
-                      }}
-                    >
-                      {g.name}
-                    </div>
-                    <div style={{ color: '#5c6b76' }}>{g.retailer ?? g.category}</div>
-                  </div>
-                </button>
-              );
-            })}
-          </div>
-        </section>
+            {busy ? 'Saving…' : look ? 'Change photo' : 'Add photo'}
+          </button>
+          <input
+            ref={fileRef}
+            type="file"
+            accept="image/jpeg,image/png,image/webp"
+            style={{ display: 'none' }}
+            onChange={(e) => void onUpload(e.target.files?.[0])}
+          />
+          {look ? (
+            <button
+              type="button"
+              style={{
+                border: '1px solid #e2e8f0',
+                borderRadius: 999,
+                padding: '5px 10px',
+                fontSize: 11,
+                color: '#64748b',
+                background: '#ffffff',
+                cursor: 'pointer',
+              }}
+              onClick={() => void dismissFigure().then(setData)}
+            >
+              Reset
+            </button>
+          ) : null}
+        </div>
+      </div>
+
+      {error ? (
+        <div
+          style={{
+            color: '#b91c1c',
+            fontSize: 12,
+            background: '#fee2e2',
+            padding: '6px 10px',
+            borderRadius: 8,
+            marginBottom: 10,
+          }}
+        >
+          {error}
+        </div>
       ) : null}
 
-      {data.savedOutfits.length > 0 ? (
-        <section style={{ marginTop: 14 }}>
-          <p
+      {/* Avatar Container */}
+      <div
+        style={{
+          position: 'relative',
+          width: '100%',
+          borderRadius: 16,
+          overflow: 'hidden',
+          background: '#f1f5f9',
+          border: '1px solid rgba(0,0,0,0.06)',
+          boxShadow: '0 4px 16px -2px rgba(15,23,42,0.08)',
+          marginBottom: 14,
+        }}
+      >
+        {look ? (
+          <img
+            src={look}
+            alt="Avatar"
             style={{
-              fontSize: 11,
-              textTransform: 'uppercase',
-              letterSpacing: '0.12em',
-              color: '#5c6b76',
-              margin: '0 0 6px',
+              width: '100%',
+              maxHeight: 340,
+              objectFit: 'contain',
+              display: 'block',
+              background: '#f8fafc',
+            }}
+          />
+        ) : (
+          <div style={{ padding: 16 }}>
+            <OutlineView data={data} />
+          </div>
+        )}
+      </div>
+
+      {/* Active Page Quick Try-On */}
+      <ActivePage onWorn={() => void refresh()} />
+
+      {/* Individual Clothes for Each Site */}
+      {data.liked.length > 0 ? (
+        <section style={{ marginTop: 14 }}>
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              marginBottom: 8,
             }}
           >
-            Auto-saved outfits
-          </p>
-          <ul style={{ listStyle: 'none', padding: 0, margin: 0, fontSize: 12 }}>
-            {data.savedOutfits.slice(0, 16).map((o) => (
-              <li key={o.id} style={{ marginBottom: 4 }}>
-                <button
-                  type="button"
-                  style={{
-                    background: 'none',
-                    border: 'none',
-                    padding: 0,
-                    textAlign: 'left',
-                    cursor: 'pointer',
-                    textDecoration: 'underline',
-                    color: '#0b6e6e',
-                  }}
-                  onClick={() => {
-                    void (async () => {
-                      const next = { ...data, slots: structuredClone(o.slots), visible: true };
-                      await saveFigure(next);
-                      setData(next);
-                    })();
-                  }}
-                >
-                  {o.name}
-                </button>
-              </li>
+            <span
+              style={{
+                fontSize: 11,
+                fontWeight: 700,
+                textTransform: 'uppercase',
+                letterSpacing: '0.06em',
+                color: '#64748b',
+              }}
+            >
+              Clothes ({data.liked.length})
+            </span>
+          </div>
+
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+            {data.liked.map((item) => (
+              <div
+                key={item.id}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  padding: '6px 8px',
+                  borderRadius: 10,
+                  background: '#ffffff',
+                  border: '1px solid #e2e8f0',
+                  gap: 8,
+                }}
+              >
+                {item.garmentImageUrl ? (
+                  <img
+                    src={item.garmentImageUrl}
+                    alt={item.name}
+                    style={{
+                      width: 32,
+                      height: 32,
+                      borderRadius: 6,
+                      objectFit: 'cover',
+                      background: '#f1f5f9',
+                      flexShrink: 0,
+                    }}
+                  />
+                ) : null}
+
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div
+                    style={{
+                      fontSize: 9,
+                      fontWeight: 700,
+                      textTransform: 'uppercase',
+                      letterSpacing: '0.05em',
+                      color: '#64748b',
+                      lineHeight: 1.1,
+                    }}
+                  >
+                    {cleanSiteName(item)}
+                  </div>
+                  <a
+                    href={item.productUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                    style={{
+                      fontSize: 12,
+                      fontWeight: 500,
+                      color: '#0f172a',
+                      textDecoration: 'none',
+                      whiteSpace: 'nowrap',
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis',
+                      display: 'block',
+                      lineHeight: 1.3,
+                    }}
+                  >
+                    {item.name}
+                  </a>
+                </div>
+
+                {/* EXACTLY two icons: Cart and Remove */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: 4, flexShrink: 0 }}>
+                  {/* Cart Icon Button */}
+                  <button
+                    type="button"
+                    title={item.inCart ? 'In cart' : 'Put in cart'}
+                    onClick={() => {
+                      void (async () => {
+                        const next = await toggleCart(item.id);
+                        setData(next);
+                      })();
+                    }}
+                    style={{
+                      width: 28,
+                      height: 28,
+                      borderRadius: 6,
+                      border: 'none',
+                      background: item.inCart ? '#ecfdf5' : '#f8fafc',
+                      color: item.inCart ? '#059669' : '#64748b',
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      padding: 0,
+                    }}
+                  >
+                    <svg
+                      width="14"
+                      height="14"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke={item.inCart ? '#059669' : 'currentColor'}
+                      strokeWidth={item.inCart ? '2.4' : '2'}
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    >
+                      <circle cx="8" cy="21" r="1" fill={item.inCart ? '#059669' : 'none'} />
+                      <circle cx="19" cy="21" r="1" fill={item.inCart ? '#059669' : 'none'} />
+                      <path d="M2.05 2.05h2l2.66 12.42a2 2 0 0 0 2 1.58h9.78a2 2 0 0 0 1.95-1.57l1.65-7.43H5.12" />
+                      {item.inCart ? <polyline points="9 11 12 14 17 9" /> : null}
+                    </svg>
+                  </button>
+
+                  {/* Remove Icon Button */}
+                  <button
+                    type="button"
+                    title="Remove from figure"
+                    onClick={() => {
+                      void (async () => {
+                        const next = await removeGarment(item.id);
+                        setData(next);
+                      })();
+                    }}
+                    style={{
+                      width: 28,
+                      height: 28,
+                      borderRadius: 6,
+                      border: 'none',
+                      background: '#f8fafc',
+                      color: '#64748b',
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      padding: 0,
+                    }}
+                  >
+                    <svg
+                      width="14"
+                      height="14"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    >
+                      <path d="M3 6h18" />
+                      <path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6" />
+                      <path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2" />
+                      <line x1="10" y1="11" x2="10" y2="17" />
+                      <line x1="14" y1="11" x2="14" y2="17" />
+                    </svg>
+                  </button>
+                </div>
+              </div>
             ))}
-          </ul>
+          </div>
+
+          {data.liked.length > 0 ? (
+            <div style={{ marginTop: 10 }}>
+              <button
+                type="button"
+                onClick={() => {
+                  void (async () => {
+                    const next = await markAllInCart();
+                    setData(next);
+                    const urls = data.liked.map((i) => i.productUrl).filter(Boolean);
+                    if (urls.length > 0) {
+                      void chrome.runtime.sendMessage({ type: 'fitmirror:open-tabs', urls });
+                    }
+                  })();
+                }}
+                style={{
+                  width: '100%',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: 6,
+                  background: data.liked.every((i) => i.inCart) ? '#ecfdf5' : '#0f172a',
+                  color: data.liked.every((i) => i.inCart) ? '#059669' : '#ffffff',
+                  border: data.liked.every((i) => i.inCart)
+                    ? '1px solid rgba(5,150,105,0.2)'
+                    : 'none',
+                  borderRadius: 999,
+                  padding: '8px 12px',
+                  fontSize: 12,
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                  transition: 'background 0.15s, color 0.15s',
+                }}
+              >
+                <svg
+                  width="14"
+                  height="14"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2.2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                >
+                  <circle cx="8" cy="21" r="1" />
+                  <circle cx="19" cy="21" r="1" />
+                  <path d="M2.05 2.05h2l2.66 12.42a2 2 0 0 0 2 1.58h9.78a2 2 0 0 0 1.95-1.57l1.65-7.43H5.12" />
+                </svg>
+                {data.liked.every((i) => i.inCart)
+                  ? '✓ All in cart'
+                  : `Put all into cart (${data.liked.length})`}
+              </button>
+            </div>
+          ) : null}
         </section>
       ) : null}
     </main>
