@@ -294,6 +294,61 @@ async function outfitChecks(token: string, otherToken: string, profileId: string
   ]);
 }
 
+async function tryonChecks(token: string, otherToken: string, profileId: string) {
+  const outfit = { garmentIds: [G.tee, G.chino], profileId };
+  const first = await call(token, 'POST', '/api/tryon', outfit);
+  check(
+    'POST /api/tryon queues a render → 202',
+    first.status === 202 &&
+      first.json.status === 'queued' &&
+      typeof first.json.renderId === 'string',
+    first.json,
+  );
+  const id = first.json.renderId as string;
+  let polled = await call(token, 'GET', `/api/tryon/${id}`);
+  for (let i = 0; i < 20 && polled.json.status !== 'done' && polled.json.status !== 'failed'; i++) {
+    await new Promise((r) => setTimeout(r, 500));
+    polled = await call(token, 'GET', `/api/tryon/${id}`);
+  }
+  check(
+    'GET /api/tryon/:id reaches done with an image',
+    polled.json.status === 'done' && polled.json.imageUrl === '/tryon-placeholder.svg',
+    polled.json,
+  );
+  const again = await call(token, 'POST', '/api/tryon', outfit);
+  check(
+    'same outfit again is a cache hit → 200 done',
+    again.status === 200 && again.json.status === 'done' && again.json.renderId === id,
+    again.json,
+  );
+  const prefix = await call(token, 'POST', '/api/tryon', { garmentIds: [G.tee], profileId });
+  check(
+    'removing the top layer is a cache hit',
+    prefix.status === 200 && prefix.json.status === 'done',
+    prefix.json,
+  );
+  const overlap = await call(token, 'POST', '/api/tryon', {
+    garmentIds: [G.tee, G.oxford],
+    profileId,
+  });
+  check('two tops → 400', overlap.status === 400, overlap.status);
+  const peek = await call(otherToken, 'GET', `/api/tryon/${id}`);
+  check("another user can't read the render → 404", peek.status === 404, peek.status);
+  const steal = await call(otherToken, 'POST', '/api/tryon', outfit);
+  check("another user can't render on this profile → 404", steal.status === 404, steal.status);
+  const demo = await call(null, 'POST', '/api/tryon?demo=1', {
+    garmentIds: [G.tee, G.chino],
+    profileId: DEMO_PROFILE,
+  });
+  check(
+    'demo try-on returns an image directly',
+    demo.status === 200 &&
+      demo.json.status === 'done' &&
+      demo.json.imageUrl === '/tryon-placeholder.svg',
+    demo.json,
+  );
+}
+
 const steps = (process.argv[3] ?? 'all').split(',');
 const users = [await newUser(), await newUser()];
 try {
@@ -305,6 +360,8 @@ try {
   if (steps.includes('all') || steps.includes('fit')) await fitChecks(a.token, b.token, profileId);
   if (steps.includes('all') || steps.includes('outfit'))
     await outfitChecks(a.token, b.token, profileId);
+  if (steps.includes('all') || steps.includes('tryon'))
+    await tryonChecks(a.token, b.token, profileId);
 } finally {
   const ids = [...users.map((u) => u.id), ...cleanupUserIds];
   for (const id of ids) await admin.auth.admin.deleteUser(id);

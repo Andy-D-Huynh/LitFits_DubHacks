@@ -43,3 +43,4 @@ export type ProfileInput = z.infer<typeof S.ProfileInputSchema>;
 export type OutfitWithItems = z.infer<typeof S.OutfitWithItemsSchema>;
 export type CreateOutfit = z.infer<typeof S.CreateOutfitSchema>;
 export type OutfitItemInput = z.infer<typeof S.OutfitItemInputSchema>;
+export type TryOnRequest = z.infer<typeof S.TryOnRequestSchema>;

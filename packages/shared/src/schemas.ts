@@ -252,3 +252,11 @@ export const OutfitItemInputSchema = z.object({
   garmentId: z.uuid(),
   size: z.string().min(1).max(20).optional(),
 });
+
+// ---- Try-on API ----
+
+// One garment per slot; up to dress/top + bottom + outerwear (or top + bottom + outerwear).
+export const TryOnRequestSchema = z.object({
+  garmentIds: z.array(z.uuid()).min(1).max(3),
+  profileId: z.uuid(),
+});

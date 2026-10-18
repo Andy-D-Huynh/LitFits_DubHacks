@@ -93,3 +93,11 @@ Running list of defaults taken under the Working mode in CLAUDE.md. Each one is 
 - Writes are a delete-then-upsert diff, not a transaction (supabase-js has none). The client reverts its optimistic state on an error, per outfit-editing.md.
 - Demo mode: outfit routes return 409; the client keeps outfits locally with the shared rules.
 - Each response includes `fits` per slot and an outfit-level `summary` ("Top fits, bottom is tight at the waist.").
+
+### Step 5: Try-on pipeline (2026-10-17)
+- Chain seed is the model photo path or `profile:<id>`; each layer gets its own render row so prefixes are cache hits. Details in `tryon.md` § Implementation.
+- Queue runs with Next's `after()` (in-process, no external queue service). Stale in-flight rows (>2 min) and failed rows are requeued.
+- `garmentIds` takes 1–3 garments, one per slot (same clash rules as outfits); an empty outfit is the client showing the bare model photo, not a render.
+- Mock person image is the placeholder; a real provider requires a model photo (409) and product images (422).
+- `ReplicateTryOn` is written but untested (no key); Gemini isn't implemented and throws if selected.
+- Try-on on Vercel needs `SUPABASE_SERVICE_ROLE_KEY`, which is on hold until M2 (ingest). Until then the deployed route returns 503 outside demo mode.
