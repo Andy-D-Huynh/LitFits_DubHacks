@@ -1,13 +1,17 @@
 import { fal } from '@fal-ai/client';
+import { garmentSizeDirective, type GarmentSizeChoice } from '@fitmirror/shared';
 
-export type FitStyle = 'regular' | 'baggy' | 'tight' | 'oversized' | 'cropped';
+export type { GarmentSizeChoice };
 
 export type NanoBananaTryOnInput = {
   modelImage: string;
   garmentImage: string;
   name: string;
   category?: string;
-  fit?: FitStyle;
+  /** Size label chosen from the product page, e.g. "M" or "32". */
+  size?: string | null;
+  /** Every size that page offers, so the garment can be graded against the run. */
+  sizes?: string[];
   color?: string | null;
 };
 
@@ -21,13 +25,13 @@ type NanoBananaOutput = {
  * Preserves all prompt requirements:
  * 1. Exact color fidelity: "needs to be the same color as the image"
  * 2. Solid plain white studio background
- * 3. Specific fit instructions: regular, baggy, tight, oversized, cropped
+ * 3. The size the product page offers, worn on an unchanged body
  * 4. Transfer only the targeted garment (pants vs tops vs dresses)
  */
 export function buildNanoBananaPrompt(
   name: string,
   category: string = 'clothing',
-  fit: FitStyle = 'regular',
+  size?: GarmentSizeChoice | null,
   color?: string | null,
 ): string {
   const cat = category.toLowerCase();
@@ -66,25 +70,7 @@ export function buildNanoBananaPrompt(
       ? `COLOR REQUIREMENT: The clothing needs to be the exact same color as the garment image (matching "${color.trim()}"). Do not change or shift the color.`
       : `COLOR REQUIREMENT: The clothing needs to be the exact same color, shade, and wash as the garment image. Do not change, shift, or alter the color.`;
 
-  let fitDirective = '';
-  switch (fit) {
-    case 'baggy':
-      fitDirective = `FIT SPECIFICATION: Make ONLY this newly added ${targetGarment} fit distinctly loose, baggy, and relaxed, with trendy streetwear fabric stacking and generous drape. Do NOT alter or make baggy any other existing clothes on the person.`;
-      break;
-    case 'oversized':
-      fitDirective = `FIT SPECIFICATION: Make ONLY this newly added ${targetGarment} oversized and slouchy, with extra volume. Keep all other garments on the person at their original fit.`;
-      break;
-    case 'tight':
-      fitDirective = `FIT SPECIFICATION: Make ONLY this newly added ${targetGarment} form-fitting, snug, and tight, with a sleek slim-fit silhouette that hugs the body. Do NOT modify the fit of any other clothes on the person.`;
-      break;
-    case 'cropped':
-      fitDirective = `FIT SPECIFICATION: Wear this ${targetGarment} neatly cropped / tucked in with a clean hem.`;
-      break;
-    case 'regular':
-    default:
-      fitDirective = `FIT SPECIFICATION: Wear this ${targetGarment} with a standard, natural, tailored regular fit.`;
-      break;
-  }
+  const sizeDirective = garmentSizeDirective(targetGarment, size);
 
   const faceDirective =
     'FACE REQUIREMENT: DO NOT CHANGE THE FACE. Strictly preserve the person\'s exact face, facial features, expression, eyes, skin tone, hair, and head from the first image with 100% identity fidelity. DO NOT CHANGE THE FACE.';
@@ -92,7 +78,7 @@ export function buildNanoBananaPrompt(
   const backgroundDirective =
     'BACKGROUND REQUIREMENT: Change the background to a clean, solid, seamless plain white studio background.';
 
-  return `High-end commercial fashion studio photography on a solid plain white background. The person in the first image wears ${targetGarment} from the second reference garment image. The clothing needs to be the exact same color as the garment image. DO NOT CHANGE THE FACE. ${faceDirective} ${backgroundDirective} ${isolationDirective} ${colorSpec} ${fitDirective} Seamless realistic lighting, perfect fabric textures, 8k resolution.`;
+  return `High-end commercial fashion studio photography on a solid plain white background. The person in the first image wears ${targetGarment} from the second reference garment image. The clothing needs to be the exact same color as the garment image. DO NOT CHANGE THE FACE. ${faceDirective} ${backgroundDirective} ${isolationDirective} ${colorSpec} ${sizeDirective} Seamless realistic lighting, sharp clear fabric detail.`;
 }
 
 async function uploadIfDataUri(urlOrDataUri: string): Promise<string> {
@@ -102,7 +88,9 @@ async function uploadIfDataUri(urlOrDataUri: string): Promise<string> {
   const match = urlOrDataUri.match(/^data:([^;]+);base64,(.+)$/);
   if (!match) return urlOrDataUri;
   const mime = match[1];
-  const buffer = Buffer.from(match[2], 'base64');
+  const payload = match[2];
+  if (!mime || !payload) return urlOrDataUri;
+  const buffer = Buffer.from(payload, 'base64');
   const blob = new Blob([buffer], { type: mime });
   return await fal.storage.upload(blob);
 }
@@ -118,15 +106,13 @@ export async function renderNanoBananaTryOn(input: NanoBananaTryOnInput): Promis
 
   fal.config({ credentials: key });
 
-  const prompt = buildNanoBananaPrompt(
-    input.name,
-    input.category,
-    input.fit || 'regular',
-    input.color,
-  );
+  const sizeChoice: GarmentSizeChoice | null = input.size
+    ? { size: input.size, offered: input.sizes ?? [] }
+    : null;
+  const prompt = buildNanoBananaPrompt(input.name, input.category, sizeChoice, input.color);
 
   console.log(
-    `[Nano Banana Pro] Preparing try-on for "${input.name}" (category: ${input.category || 'auto'}, fit: ${input.fit || 'regular'}, color: ${input.color || 'auto'})`,
+    `[Nano Banana Pro] Preparing try-on for "${input.name}" (category: ${input.category || 'auto'}, size: ${input.size || 'as shown'}, color: ${input.color || 'auto'})`,
   );
   const [humanImageUrl, garmentImageUrl] = await Promise.all([
     uploadIfDataUri(input.modelImage),
@@ -138,11 +124,12 @@ export async function renderNanoBananaTryOn(input: NanoBananaTryOnInput): Promis
     input: {
       prompt,
       system_prompt:
-        "DO NOT CHANGE THE FACE. Strictly preserve the person's exact face, facial features, identity, expression, and hairstyle from the first image with zero modification.",
+        "DO NOT CHANGE THE FACE. Strictly preserve the person's exact face, facial features, identity, expression, and hairstyle from the first image with zero modification. Keep the person's body proportions, height, and build exactly as in the first image. Changing the clothing size must not resize the person; only the new garment's ease and length change.",
       image_urls: [humanImageUrl, garmentImageUrl],
       num_images: 1,
       aspect_ratio: 'auto',
-      output_format: 'png',
+      output_format: 'jpeg',
+      // 1K is the smallest size nano-banana-pro offers. It stays sharp in the avatar and is faster than 2K or 4K.
       resolution: '1K',
       safety_tolerance: '4',
       limit_generations: true,
@@ -150,8 +137,8 @@ export async function renderNanoBananaTryOn(input: NanoBananaTryOnInput): Promis
     logs: true,
     onQueueUpdate: (update) => {
       console.log('[Nano Banana Pro Queue]', update.status);
-      if (update.status === 'IN_PROGRESS' && Array.isArray((update as any).logs)) {
-        (update as any).logs.forEach((log: { message: string }) =>
+      if (update.status === 'IN_PROGRESS' && Array.isArray((update as { logs?: unknown }).logs)) {
+        (update as { logs: Array<{ message: string }> }).logs.forEach((log) =>
           console.log('[Nano Banana Pro Log]', log.message),
         );
       }

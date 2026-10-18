@@ -377,6 +377,17 @@ export async function toggleCart(id: string, forceInCart?: boolean): Promise<Fig
   return next;
 }
 
+/** Show the uploaded photo again. Generated looks stay in history. */
+export async function resetAvatarImage(): Promise<FigurePersist> {
+  const current = await loadFigure();
+  const next: FigurePersist = {
+    ...current,
+    avatarImageUrl: null,
+  };
+  await saveFigure(next);
+  return next;
+}
+
 export async function dismissFigure(): Promise<FigurePersist> {
   const current = await loadFigure();
   const next: FigurePersist = {

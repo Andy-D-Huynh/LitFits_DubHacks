@@ -97,7 +97,7 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
         const name = typeof message.name === 'string' ? message.name : 'Product';
         const retailer = typeof message.retailer === 'string' ? message.retailer : null;
 
-        console.log('[FitMirror Background] Starting try-on for:', name, 'Category:', message.category, 'Fit:', message.fit);
+        console.log('[FitMirror Background] Starting try-on for:', name, 'Category:', message.category, 'Size:', message.size);
 
         const tryPorts = ['http://localhost:3000', 'http://localhost:3001'];
         let res: Response | null = null;
@@ -118,7 +118,10 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
                 name,
                 retailer,
                 category: typeof message.category === 'string' ? message.category : 'auto',
-                fit: typeof message.fit === 'string' ? message.fit : 'regular',
+                size: typeof message.size === 'string' ? message.size : undefined,
+                sizes: Array.isArray(message.sizes)
+                  ? message.sizes.filter((entry: unknown): entry is string => typeof entry === 'string').slice(0, 40)
+                  : undefined,
                 color: typeof message.color === 'string' ? message.color : null,
               }),
             });

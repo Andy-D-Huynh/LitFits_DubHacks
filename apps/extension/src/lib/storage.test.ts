@@ -3,6 +3,7 @@ import {
   applyTryOnResult,
   loadFigure,
   removeGarment,
+  resetAvatarImage,
   restoreGeneratedLook,
   setModelPhoto,
   toggleCart,
@@ -56,6 +57,28 @@ describe('storage garment management', () => {
     // Since no garments remain, avatarImageUrl resets to null so it falls back to modelImage
     expect(afterRemove.avatarImageUrl).toBeNull();
     expect(afterRemove.modelImage).toBe('data:image/jpeg;base64,basephoto');
+  });
+
+  it('puts the avatar image back to the uploaded photo', async () => {
+    await setModelPhoto('data:image/jpeg;base64,basephoto', null);
+    await applyTryOnResult(
+      'data:image/jpeg;base64,renderlook',
+      {
+        id: 'g-1',
+        productUrl: 'https://zara.com/jacket',
+        name: 'Puffer Jacket',
+        garmentImageUrl: 'https://zara.com/img.jpg',
+        retailer: 'Zara',
+        addedAt: new Date().toISOString(),
+        inCart: false,
+      },
+      'outerwear',
+    );
+
+    const reset = await resetAvatarImage();
+    expect(reset.avatarImageUrl).toBeNull();
+    expect(reset.modelImage).toBe('data:image/jpeg;base64,basephoto');
+    expect(reset.lookHistory).toHaveLength(1);
   });
 
   it('restores a saved look with the clothes that were worn in it', async () => {

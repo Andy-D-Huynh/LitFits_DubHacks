@@ -1,4 +1,5 @@
 import { captureProductImage, extractProductFromPage } from '../lib/extract-product';
+import { readPageSizes, selectPageSize } from '../lib/page-sizes';
 import { fileToModelImage } from '../lib/photo';
 import {
   consumePendingCartAdd,
@@ -42,7 +43,8 @@ async function tryOnProduct(
   name: string,
   retailer?: string | null,
   category?: GarmentCategory,
-  fit?: string,
+  size?: string | null,
+  sizes?: string[],
   color?: string | null,
 ): Promise<{ ok: boolean; error?: string }> {
   const garmentImage = await captureProductImage(garmentImageUrl);
@@ -56,7 +58,8 @@ async function tryOnProduct(
     name,
     retailer: retailer ?? null,
     category: category ?? 'auto',
-    fit: fit ?? 'regular',
+    size: size || undefined,
+    sizes: sizes ?? [],
     color: color ?? null,
   })) as { ok?: boolean; error?: string } | undefined;
   if (!response?.ok) return { ok: false, error: response?.error || 'Try-on failed' };
@@ -65,19 +68,22 @@ async function tryOnProduct(
 
 async function tryOnThisPage(
   category?: GarmentCategory,
-  fit?: string,
+  size?: string | null,
+  sizes?: string[],
 ): Promise<{ ok: boolean; error?: string }> {
   const product = extractProductFromPage();
   if (!product.imageUrl) {
     return { ok: false, error: 'No product image found on this page.' };
   }
+  const pageSizes = sizes ? null : readPageSizes();
   return tryOnProduct(
     product.imageUrl,
     product.sourceUrl,
     product.name,
     product.retailer,
     category ?? product.category,
-    fit,
+    size ?? pageSizes?.selected ?? null,
+    sizes ?? pageSizes?.sizes ?? [],
     product.color,
   );
 }
@@ -583,7 +589,7 @@ function ensureAvatar() {
       to { transform: rotate(360deg); }
     }
 
-    /* Fit Style Dropdown Bar */
+    /* Category and page-size selectors */
     .fit-select-bar {
       padding: 6px 8px 4px;
       background: #ffffff;
@@ -952,8 +958,31 @@ function ensureAvatar() {
   let activeTab: 'worn' | 'saved' = 'worn';
   let errorMessage: string | null = null;
   let infoMessage: string | null = null;
-  let selectedFit: 'regular' | 'baggy' | 'tight' | 'oversized' | 'cropped' = 'regular';
+  let chosenSize: string | null = null;
+  let chosenSizeUrl = '';
+  let userOverrodeSize = false;
+  let syncingPageSize = false;
+  let lastSizeKey = '';
   let currentCategoryOverride: GarmentCategory | null = null;
+
+  function syncChosenSize(productUrl: string) {
+    const pageSizes = readPageSizes();
+    if (chosenSizeUrl !== productUrl) {
+      chosenSizeUrl = productUrl;
+      userOverrodeSize = false;
+      chosenSize = null;
+    }
+    const stillOffered =
+      !!chosenSize &&
+      pageSizes.sizes.some((size) => size.toLowerCase() === chosenSize?.toLowerCase());
+    if (chosenSize && pageSizes.sizes.length > 0 && !stillOffered) {
+      userOverrodeSize = false;
+      chosenSize = null;
+    }
+    if (!userOverrodeSize) chosenSize = pageSizes.selected;
+    lastSizeKey = `${pageSizes.selected ?? ''}::${pageSizes.sizes.join('|')}`;
+    return pageSizes;
+  }
 
   function openLightbox(imageUrl: string) {
     shadow.querySelector('.lightbox-overlay')?.remove();
@@ -1217,70 +1246,85 @@ function ensureAvatar() {
         (product.name && item.name.toLowerCase() === product.name.toLowerCase()),
     );
 
+    const pageSizes = syncChosenSize(product.sourceUrl);
+    const sizeSuffix = chosenSize ? ` (${chosenSize})` : '';
+
     // 2. Quick Action Bar (Try on or Remove)
     if (product.imageUrl && figure.modelImage && !busy) {
-      if (!currentWorn) {
-        const fitBar = document.createElement('div');
-        fitBar.className = 'fit-select-bar';
+      const fitBar = document.createElement('div');
+      fitBar.className = 'fit-select-bar';
 
-        const activeCategory = currentCategoryOverride ?? product.category;
+      const activeCategory = currentCategoryOverride ?? product.category;
 
-        // 1. Category Selector (Top, Bottom, Jacket, Dress)
-        const catSelect = document.createElement('select');
-        catSelect.className = 'fit-select';
-        catSelect.style.flex = '1';
-        catSelect.title = 'Choose item category to try on';
+      const catSelect = document.createElement('select');
+      catSelect.className = 'fit-select';
+      catSelect.style.flex = '1';
+      catSelect.title = 'Choose item category to try on';
 
-        const catOptions: Array<{ value: GarmentCategory; label: string }> = [
-          { value: 'top', label: 'Top' },
-          { value: 'bottom', label: 'Bottom' },
-          { value: 'outerwear', label: 'Jacket' },
-          { value: 'dress', label: 'Dress' },
-        ];
+      const catOptions: Array<{ value: GarmentCategory; label: string }> = [
+        { value: 'top', label: 'Top' },
+        { value: 'bottom', label: 'Bottom' },
+        { value: 'outerwear', label: 'Jacket' },
+        { value: 'dress', label: 'Dress' },
+      ];
 
-        for (const opt of catOptions) {
-          const optEl = document.createElement('option');
-          optEl.value = opt.value;
-          optEl.textContent = opt.value === product.category ? `${opt.label} (auto)` : opt.label;
-          if (opt.value === activeCategory) optEl.selected = true;
-          catSelect.append(optEl);
+      for (const opt of catOptions) {
+        const optEl = document.createElement('option');
+        optEl.value = opt.value;
+        optEl.textContent = opt.value === product.category ? `${opt.label} (auto)` : opt.label;
+        if (opt.value === activeCategory) optEl.selected = true;
+        catSelect.append(optEl);
+      }
+
+      catSelect.addEventListener('change', () => {
+        currentCategoryOverride = catSelect.value as GarmentCategory;
+        void render();
+        void placeTryOnBadge();
+      });
+
+      const sizeSelect = document.createElement('select');
+      sizeSelect.className = 'fit-select';
+      sizeSelect.style.flex = '1';
+      sizeSelect.title = 'Size listed on this page';
+
+      if (pageSizes.sizes.length === 0) {
+        const optEl = document.createElement('option');
+        optEl.value = '';
+        optEl.textContent = 'As shown';
+        sizeSelect.append(optEl);
+        sizeSelect.disabled = true;
+        sizeSelect.title = 'This page does not list sizes';
+      } else {
+        if (!chosenSize) {
+          const placeholder = document.createElement('option');
+          placeholder.value = '';
+          placeholder.textContent = 'Choose size';
+          placeholder.selected = true;
+          sizeSelect.append(placeholder);
         }
-
-        catSelect.addEventListener('change', () => {
-          currentCategoryOverride = catSelect.value as GarmentCategory;
+        for (const label of pageSizes.sizes) {
+          const optEl = document.createElement('option');
+          optEl.value = label;
+          optEl.textContent = label;
+          if (label.toLowerCase() === chosenSize?.toLowerCase()) optEl.selected = true;
+          sizeSelect.append(optEl);
+        }
+        if (chosenSize) sizeSelect.value = chosenSize;
+        sizeSelect.addEventListener('change', () => {
+          chosenSize = sizeSelect.value || null;
+          userOverrodeSize = Boolean(chosenSize);
+          syncingPageSize = true;
+          if (chosenSize) selectPageSize(chosenSize);
+          window.setTimeout(() => {
+            syncingPageSize = false;
+          }, 400);
           void render();
           void placeTryOnBadge();
         });
-
-        // 2. Fit Style Selector (Regular, Baggy, Tight, Oversized, Cropped)
-        const fitSelect = document.createElement('select');
-        fitSelect.className = 'fit-select';
-        fitSelect.style.flex = '1';
-        fitSelect.title = 'Choose fit style for this item';
-
-        const fitOptions = [
-          { value: 'regular', label: 'Regular' },
-          { value: 'baggy', label: 'Baggy' },
-          { value: 'tight', label: 'Tight' },
-          { value: 'oversized', label: 'Oversized' },
-          { value: 'cropped', label: 'Cropped' },
-        ];
-
-        for (const opt of fitOptions) {
-          const optEl = document.createElement('option');
-          optEl.value = opt.value;
-          optEl.textContent = opt.label;
-          if (opt.value === selectedFit) optEl.selected = true;
-          fitSelect.append(optEl);
-        }
-
-        fitSelect.addEventListener('change', () => {
-          selectedFit = fitSelect.value as typeof selectedFit;
-        });
-
-        fitBar.append(catSelect, fitSelect);
-        card.append(fitBar);
       }
+
+      fitBar.append(catSelect, sizeSelect);
+      card.append(fitBar);
 
       const tryonBar = document.createElement('div');
       tryonBar.className = 'tryon-bar';
@@ -1305,7 +1349,7 @@ function ensureAvatar() {
         const btnRetry = document.createElement('button');
         btnRetry.type = 'button';
         btnRetry.className = 'tryon-btn';
-        btnRetry.innerHTML = `${SVG_HANGER} Try again`;
+        btnRetry.innerHTML = `${SVG_HANGER} Try again${sizeSuffix}`;
         btnRetry.addEventListener('click', () => {
           void triggerTryOn();
         });
@@ -1317,8 +1361,8 @@ function ensureAvatar() {
         const tryonBtn = document.createElement('button');
         tryonBtn.type = 'button';
         tryonBtn.className = 'tryon-btn';
-        tryonBtn.innerHTML = `${SVG_HANGER} Try on ${catLabel}`;
-        tryonBtn.title = `Try on as ${catLabel}`;
+        tryonBtn.innerHTML = `${SVG_HANGER} Try on ${catLabel}${sizeSuffix}`;
+        tryonBtn.title = chosenSize ? `Try on size ${chosenSize} as ${catLabel}` : `Try on as ${catLabel}`;
         tryonBtn.addEventListener('click', () => {
           void triggerTryOn();
         });
@@ -1328,7 +1372,7 @@ function ensureAvatar() {
       card.append(tryonBar);
     }
 
-    // 3. Tabs: Worn clothes vs Saved generated looks
+    // 3. Tabs: Current clothes vs Saved generated looks
     const looks = figure.lookHistory || [];
     const hasWorn = figure.liked.length > 0;
 
@@ -1339,7 +1383,7 @@ function ensureAvatar() {
       const tabWorn = document.createElement('button');
       tabWorn.type = 'button';
       tabWorn.className = `tab-btn ${activeTab === 'worn' ? 'active' : ''}`;
-      tabWorn.textContent = `Worn (${figure.liked.length})`;
+      tabWorn.textContent = `Current (${figure.liked.length})`;
       tabWorn.addEventListener('click', () => {
         activeTab = 'worn';
         void render();
@@ -1579,8 +1623,10 @@ function ensureAvatar() {
     try {
       const product = extractProductFromPage();
       const activeCategory = currentCategoryOverride ?? product.category;
-      console.log('[FitMirror] Initiating try-on on current page:', product.name, activeCategory, selectedFit);
-      const res = await tryOnThisPage(activeCategory, selectedFit);
+      const offered = syncChosenSize(product.sourceUrl);
+      const sizes = offered.sizes.length > 0 ? offered.sizes : chosenSize ? [chosenSize] : [];
+      console.log('[FitMirror] Initiating try-on on current page:', product.name, activeCategory, chosenSize);
+      const res = await tryOnThisPage(activeCategory, chosenSize, sizes);
       console.log('[FitMirror] Try-on response:', res);
       if (!res.ok) {
         errorMessage = res.error || 'Try-on failed.';
@@ -1619,6 +1665,8 @@ function ensureAvatar() {
 
     const activeCategory = currentCategoryOverride ?? product.category;
     const catLabel = formatCategoryLabel(activeCategory, product.name);
+    syncChosenSize(product.sourceUrl);
+    const sizeSuffix = chosenSize ? ` (${chosenSize})` : '';
 
     const badge = document.createElement('button');
     badge.id = 'fitmirror-tryon-badge';
@@ -1627,8 +1675,10 @@ function ensureAvatar() {
       badge.innerHTML = `${SVG_REMOVE} Remove`;
       badge.title = 'Remove this garment from your avatar';
     } else {
-      badge.innerHTML = `${SVG_HANGER} Try on ${catLabel}`;
-      badge.title = `Try on ${product.name} as ${catLabel}`;
+      badge.innerHTML = `${SVG_HANGER} Try on ${catLabel}${sizeSuffix}`;
+      badge.title = chosenSize
+        ? `Try on size ${chosenSize} of ${product.name} as ${catLabel}`
+        : `Try on ${product.name} as ${catLabel}`;
     }
 
     badge.style.cssText = [
@@ -1736,6 +1786,34 @@ function ensureAvatar() {
     void render();
     void placeTryOnBadge();
   });
+
+  const refreshIfPageSizeChanged = () => {
+    if (syncingPageSize || userOverrodeSize || busy) return;
+    const next = readPageSizes();
+    const key = `${next.selected ?? ''}::${next.sizes.join('|')}`;
+    if (key === lastSizeKey) return;
+    void render();
+    void placeTryOnBadge();
+  };
+
+  document.addEventListener(
+    'click',
+    (event) => {
+      const target = event.target;
+      if (target instanceof Node && root.contains(target)) return;
+      window.setTimeout(refreshIfPageSizeChanged, 80);
+    },
+    true,
+  );
+  document.addEventListener(
+    'change',
+    (event) => {
+      const target = event.target;
+      if (target instanceof Node && root.contains(target)) return;
+      window.setTimeout(refreshIfPageSizeChanged, 80);
+    },
+    true,
+  );
 
   void render();
   void placeTryOnBadge();

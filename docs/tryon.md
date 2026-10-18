@@ -42,4 +42,4 @@ Outfits layer sequentially: render the top onto the person photo, then feed that
 
 ## Known limitation (shown in UI)
 
-The render does not reflect size. Always place it next to the fit panel, never alone.
+The extension try-on depicts the size the shopper picked from the sizes listed on the product page. The person's body proportions stay the same; only that garment's ease and length change. The fit verdict still comes from the fit engine, not from this image. Place the render next to the fit panel.

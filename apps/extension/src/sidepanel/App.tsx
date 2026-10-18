@@ -2,10 +2,10 @@ import { useEffect, useRef, useState } from 'react';
 import { extractOutline } from '../lib/outline';
 import { fileToModelImage } from '../lib/photo';
 import {
-  dismissFigure,
   loadFigure,
   markAllInCart,
   removeGarment,
+  resetAvatarImage,
   setModelPhoto,
   toggleCart,
 } from '../lib/storage';
@@ -139,7 +139,7 @@ export function App() {
                 background: '#ffffff',
                 cursor: 'pointer',
               }}
-              onClick={() => void dismissFigure().then(setData)}
+              onClick={() => void resetAvatarImage().then(setData)}
             >
               Reset
             </button>
