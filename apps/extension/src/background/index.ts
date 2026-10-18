@@ -160,6 +160,31 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
     return true;
   }
 
+  if (message?.type === 'fitmirror:locate-cart' && message.payload) {
+    void (async () => {
+      for (const base of ['http://localhost:3000', 'http://localhost:3001']) {
+        try {
+          const controller = new AbortController();
+          const timer = setTimeout(() => controller.abort(), 20_000);
+          const res = await fetch(`${base}/api/cart/locate`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            signal: controller.signal,
+            body: JSON.stringify(message.payload),
+          });
+          clearTimeout(timer);
+          const data = await res.json();
+          sendResponse(res.ok ? { ok: true, ...data } : { ok: false, error: data?.error });
+          return;
+        } catch (err: any) {
+          console.warn(`[FitMirror Background] Cart locate via ${base} failed:`, err?.message);
+        }
+      }
+      sendResponse({ ok: false, error: 'Could not reach the FitMirror server.' });
+    })();
+    return true;
+  }
+
   if (message?.type === 'fitmirror:fetch-image' && typeof message.url === 'string') {
     void (async () => {
       try {

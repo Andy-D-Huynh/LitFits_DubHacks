@@ -16,6 +16,7 @@ const ServerEnvSchema = z.object({
   REPLICATE_API_TOKEN: optional,
   TRYON_MODEL: optional,
   GEMINI_API_KEY: optional,
+  GEMINI_MODEL: z.string().min(1).default('gemini-3.8-flash'),
   FAL_KEY: optional,
   PAYMENT_PROVIDER: z.enum(['visa', 'mock']).default('mock'),
   MESSAGING_PROVIDER: z.enum(['photon', 'mock']).default('mock'),

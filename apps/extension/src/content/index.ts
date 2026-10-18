@@ -14,6 +14,7 @@ import {
   toggleCart,
 } from '../lib/storage';
 import type { BrowsedProduct, FigurePersist, GarmentCategory, LikedGarment } from '../lib/types';
+import { aiAddToCart } from './ai-cart';
 import { maybeSyncStudio } from './studio-sync';
 
 maybeSyncStudio();
@@ -286,13 +287,23 @@ function isClickableButton(el: HTMLElement): boolean {
   return true;
 }
 
+/** Wishlist hearts and similar sit right next to "Add to bag" and often share its classes. */
+function isNotCartAction(el: HTMLElement): boolean {
+  const haystack = [
+    el.innerText || el.textContent || '',
+    el.getAttribute('aria-label') || '',
+    el.getAttribute('title') || '',
+    el.id,
+    el.className?.toString() || '',
+  ].join(' ');
+  return /wish|favou?rite|save for later|saved|heart|share|notify|size guide|find in store/i.test(haystack);
+}
+
 function findAddToCartButton(): { btn: HTMLElement | null; disabledBtn: HTMLElement | null } {
   const selectors = [
     // Zara
     'button[data-qa-action="add-to-cart"]',
     'button[data-qa="product-add-to-cart-button"]',
-    '.product-detail-actions button',
-    '.product-actions button',
     // Uniqlo
     'button[data-test="add-to-cart"]',
     '#add-to-cart-btn',
@@ -305,7 +316,6 @@ function findAddToCartButton(): { btn: HTMLElement | null; disabledBtn: HTMLElem
     '.add-to-bag',
     // Diesel & Salesforce Commerce Cloud
     'button.add-to-cart',
-    'button[data-pid]',
     'button[data-add-to-cart]',
     '.add-to-cart-global button',
     '.add-to-cart-btn',
@@ -339,6 +349,7 @@ function findAddToCartButton(): { btn: HTMLElement | null; disabledBtn: HTMLElem
     const elements = Array.from(document.querySelectorAll<HTMLElement>(sel));
     for (const el of elements) {
       if (el.id === 'fitmirror-tryon-badge' || el.closest('#fitmirror-avatar-root')) continue;
+      if (isNotCartAction(el)) continue;
       if (isClickableButton(el)) {
         btn = el;
         break;
@@ -410,8 +421,23 @@ async function runAutoAddToCartWithRetry(
 
   const startTime = Date.now();
   let sizeClicked = false;
+  // Give the page a moment to render before paying for a Gemini call.
+  const aiAfterMs = Math.min(2500, maxWaitMs / 2);
+  let aiTried = false;
 
   while (Date.now() - startTime < maxWaitMs) {
+    if (!aiTried && Date.now() - startTime >= aiAfterMs) {
+      aiTried = true;
+      showToastNotification('FitMirror: Reading the page to find the add button...', 4000);
+      const ai = await aiAddToCart(extractProductFromPage().name, clickAddToCartButton);
+      if (ai.clicked) {
+        showToastNotification(`✓ Clicked "${ai.text ?? 'Add to cart'}"`, 4500, true);
+        autoCartActive = false;
+        return { success: true, message: 'Added to your store bag!' };
+      }
+      console.warn('[FitMirror] AI add-to-cart fallback:', ai.error);
+    }
+
     if (!sizeClicked) {
       const didSelect = autoSelectSizeIfRequired();
       if (didSelect) {
