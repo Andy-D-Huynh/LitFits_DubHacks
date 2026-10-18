@@ -34,7 +34,8 @@ Ease = garment dim − body dim, in cm of circumference. Starting targets:
   - Top: chest 0.5, shoulder 0.25, waist 0.1, renormalized to sum to 1 (≈ 0.588, 0.294, 0.118). **Length is excluded from scoring** because no body measurement corresponds to it.
   - Bottom: waist 0.4, hip 0.35, inseam 0.25
 - **Sleeve is note-only:** it gets a `DimResult` with a verdict and note when both values exist, but no score weight.
-- **Missing dims:** when a scored dim can't be evaluated for a size (absent from the chart or from the profile), renormalize the weights over the dims that were evaluated, and add an explanation line naming what wasn't checked, e.g. "Inseam not checked: the size chart has no inseam." Only scored dims count as missing; length and sleeve never do. The fewer-than-two-critical-dims rule below still applies.- Overall verdict:
+- **Missing dims:** when a scored dim can't be evaluated for a size (absent from the chart or from the profile), renormalize the weights over the dims that were evaluated, and add an explanation line naming what wasn't checked, e.g. "Inseam not checked: the size chart has no inseam." Only scored dims count as missing; length and sleeve never do. The fewer-than-two-critical-dims rule below still applies.
+- Overall verdict:
   - `tight` if any critical dim (chest, waist, hip) is more than 3 cm below its minimum ease
   - `loose` if the main dim exceeds its maximum by more than 6 cm
   - else `good` if score ≥ 0.8
@@ -54,3 +55,23 @@ Every dim result carries a human-readable note, e.g. "Chest: 6 cm of ease, targe
 ## Tests
 
 At least 20 vitest unit tests covering both chart types, flat vs circumference, stretch, between-sizes, and missing dims.
+
+## Implementation decisions (M1, 2026-10-17)
+
+Confirmed by the team:
+- **Low score:** if neither the tight nor the loose rule fires and the score is below 0.8, the overall verdict is the direction of the dim losing the most weighted score (below its band → `tight`, above → `loose`).
+- **Outerwear** uses the top bands and weights. **Dress** uses the top rules for chest, shoulder and waist plus the bottom hip band, weights chest 0.5, shoulder 0.25, waist 0.1, hip 0.35 (renormalized).
+- **Critical-dim minimum:** tops and outerwear need chest; bottoms need two of waist/hip; dresses need two of chest/waist/hip. Otherwise the size can't be recommended.
+- **Sleeve:** verdict `unknown`, with a factual note, e.g. "Sleeve: 64 cm vs your 61 cm arm length (+3 cm); not scored."
+
+Defaults taken where the spec is silent (change here if wrong):
+- **Stretch:** the min-ease reduction applies to every ease band (chest, waist, shoulder, hip) except the bottom waist and inseam. A stretch bottom waist (low or high) uses −4 to 2 instead of 0 to 4, with no further reduction.
+- **Main dim** (loose rule) is the highest-weight dim: chest for top, outerwear and dress; waist for bottom.
+- **Body charts** use the range as the band. Overall `tight` if a critical body dim is more than 3 cm above the range; `loose` if the main dim is more than 6 cm below it.
+- **Between sizes** (body charts): a critical body dim lies strictly between one size's max and the next size's min. Rows are assumed smallest to largest. The first such dim in weight order decides, and both sizes must qualify.
+- **Ties:** snug picks the smaller size, regular and loose the larger.
+- **Confidence base** when no rule applies (e.g. body chart, manual dims): `medium`. A missing `measurement_source` entry counts as manual. No recommendation → `low`.
+- **"Not checked" lines** go in `FitResult.warnings`, deduplicated across sizes.
+- **Unknown inputs:** no chart or chart type → no recommendation. A garment chart with unknown basis → no recommendation, since flat vs circumference is a 2× difference. Unknown fit type → regular targets plus a warning.
+- **Mixed values:** a range in a garment chart uses its midpoint; a single number in a body chart is a one-point range.
+- **Length** produces no `DimResult` (no body measurement to compare).
