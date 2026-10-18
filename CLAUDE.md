@@ -78,3 +78,9 @@ Once code exists, code wins over docs: `packages/shared/src/types.ts`, `schemas.
 | `docs/ui.md` | Studio, compare, checkout pages, components, 3D figure |
 | `docs/checkout-privacy.md` | Payment provider, VISA sandbox, privacy and security |
 | `docs/build-plan.md` | Milestones, acceptance criteria, open questions |
+
+
+## Working mode
+When a spec gap has a reasonable default, pick it, record it in the relevant doc, and keep going.
+Only stop to ask for: irreversible changes, anything that touches a teammate's area (studio UI, extension UI, 3D), adding paid services, or pushing to main.
+Commit after each milestone with tests passing. Work on feature branches; never push to main.
