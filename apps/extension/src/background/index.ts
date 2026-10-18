@@ -2,6 +2,7 @@ import {
   applyTryOnResult,
   loadFigure,
   markAllInCart,
+  markPendingCartAdd,
   removeGarment,
   toggleCart,
 } from '../lib/storage';
@@ -46,18 +47,23 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
   }
 
   if (message?.type === 'fitmirror:open-tabs' && Array.isArray(message.urls)) {
-    for (const rawUrl of message.urls) {
-      if (typeof rawUrl === 'string' && (rawUrl.startsWith('http://') || rawUrl.startsWith('https://'))) {
-        const url = message.autoAddToCart
-          ? rawUrl.includes('#')
-            ? `${rawUrl}&fitmirror_cart=1`
-            : `${rawUrl}#fitmirror_cart=1`
-          : rawUrl;
-        chrome.tabs.create({ url, active: true }).catch(() => {});
+    void (async () => {
+      for (const rawUrl of message.urls) {
+        if (typeof rawUrl === 'string' && (rawUrl.startsWith('http://') || rawUrl.startsWith('https://'))) {
+          if (message.autoAddToCart) {
+            await markPendingCartAdd(rawUrl);
+          }
+          const url = message.autoAddToCart
+            ? rawUrl.includes('#')
+              ? `${rawUrl}&fitmirror_cart=1`
+              : `${rawUrl}#fitmirror_cart=1`
+            : rawUrl;
+          chrome.tabs.create({ url, active: true }).catch(() => {});
+        }
       }
-    }
-    sendResponse({ ok: true });
-    return false;
+      sendResponse({ ok: true });
+    })();
+    return true;
   }
 
   if (message?.type === 'fitmirror:try-on') {

@@ -56,4 +56,23 @@ describe('storage garment management', () => {
     expect(afterRemove.avatarImageUrl).toBeNull();
     expect(afterRemove.modelImage).toBe('data:image/jpeg;base64,basephoto');
   });
+
+  it('marks and consumes pending cart additions reliably', async () => {
+    const { markPendingCartAdd, consumePendingCartAdd } = await import('./storage');
+
+    await markPendingCartAdd('https://shop.diesel.com/en-us/jackets/p-1234.html');
+
+    // Mismatched site should not consume
+    const wrongSite = await consumePendingCartAdd('https://zara.com/jacket');
+    expect(wrongSite).toBe(false);
+
+    // Matching site and path (including prefix or www variations)
+    const matched = await consumePendingCartAdd('https://www.shop.diesel.com/en-us/jackets/p-1234.html?ref=cart');
+    expect(matched).toBe(true);
+
+    // After consumption, subsequent calls should return false
+    const consumedAgain = await consumePendingCartAdd('https://shop.diesel.com/en-us/jackets/p-1234.html');
+    expect(consumedAgain).toBe(false);
+  });
 });
+

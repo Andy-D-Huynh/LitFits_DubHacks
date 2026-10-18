@@ -1,6 +1,7 @@
 import { captureProductImage, extractProductFromPage } from '../lib/extract-product';
 import { fileToModelImage } from '../lib/photo';
 import {
+  consumePendingCartAdd,
   deleteGeneratedLook,
   loadFigure,
   markAllInCart,
@@ -136,36 +137,156 @@ function isCurrentPage(url: string): boolean {
   try {
     const cur = new URL(location.href);
     const target = new URL(url);
-    return cur.hostname === target.hostname && cur.pathname === target.pathname;
+    const curHost = cur.hostname.replace(/^www\./, '').toLowerCase();
+    const targetHost = target.hostname.replace(/^www\./, '').toLowerCase();
+    const curPath = cur.pathname.replace(/\/$/, '').toLowerCase();
+    const targetPath = target.pathname.replace(/\/$/, '').toLowerCase();
+    return curHost === targetHost && curPath === targetPath;
   } catch {
     return false;
   }
 }
 
-/** Automatically trigger the retailer's real "Add to Bag" / "Add to Cart" button */
-function triggerStoreAddToCart(): { success: boolean; message: string } {
-  // 1. Try to auto-select size first if buttons exist and none is active
-  const sizeOptions = Array.from(
-    document.querySelectorAll<HTMLElement>(
-      'button[data-qa-action*="size"]:not([disabled]), .size-selector button:not([disabled]), [data-testid*="size"] button:not([disabled]), input[type="radio"][name*="size"]:not([disabled]) + label, .product-form__input--pill input:not([disabled]) + label, ul.sizes button:not([disabled]), .swatches--size button:not([disabled]), [class*="size-picker" i] button:not([disabled]), [data-attr="size"] button:not([disabled])'
+/** Display an on-screen toast notification confirming cart actions */
+function showToastNotification(text: string, duration = 4000, isSuccess = false) {
+  try {
+    let toast = document.getElementById('fitmirror-toast-notification');
+    if (!toast) {
+      toast = document.createElement('div');
+      toast.id = 'fitmirror-toast-notification';
+      document.documentElement.appendChild(toast);
+    }
+    toast.style.cssText = [
+      'position: fixed',
+      'z-index: 2147483647',
+      'top: 24px',
+      'right: 24px',
+      'background: rgba(15, 23, 42, 0.95)',
+      'backdrop-filter: blur(12px)',
+      '-webkit-backdrop-filter: blur(12px)',
+      'color: #ffffff',
+      `border: 1px solid ${isSuccess ? 'rgba(34, 197, 94, 0.7)' : 'rgba(255, 255, 255, 0.2)'}`,
+      `box-shadow: 0 12px 32px rgba(0, 0, 0, 0.4)${isSuccess ? ', 0 0 16px rgba(34, 197, 94, 0.35)' : ''}`,
+      'border-radius: 999px',
+      'padding: 10px 20px',
+      'font: 600 13px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+      'display: flex',
+      'align-items: center',
+      'gap: 8px',
+      'transition: opacity 0.25s cubic-bezier(0.16, 1, 0.3, 1), transform 0.25s cubic-bezier(0.16, 1, 0.3, 1)',
+      'opacity: 0',
+      'transform: translateY(-8px)',
+      'pointer-events: none',
+    ].join(';');
+
+    toast.textContent = text;
+    requestAnimationFrame(() => {
+      if (toast) {
+        toast.style.opacity = '1';
+        toast.style.transform = 'translateY(0)';
+      }
+    });
+
+    window.setTimeout(() => {
+      if (toast) {
+        toast.style.opacity = '0';
+        toast.style.transform = 'translateY(-8px)';
+        window.setTimeout(() => toast?.remove(), 300);
+      }
+    }, duration);
+  } catch {}
+}
+
+/** Check and auto-select product size if mandatory on this store */
+function autoSelectSizeIfRequired(): boolean {
+  // 1. Check native select dropdowns (Shopify, standard stores)
+  const sizeSelects = Array.from(
+    document.querySelectorAll<HTMLSelectElement>(
+      'select[name*="size" i], select[id*="size" i], select[data-testid*="size" i], select[aria-label*="size" i], select.product-form__input, select[name="id"]'
     )
   );
-
-  const hasSelectedSize = sizeOptions.some(
-    (el) =>
-      el.classList.contains('active') ||
-      el.classList.contains('selected') ||
-      el.getAttribute('aria-checked') === 'true' ||
-      el.getAttribute('aria-selected') === 'true'
-  );
-
-  if (sizeOptions.length > 0 && !hasSelectedSize) {
-    try {
-      sizeOptions[0].click();
-    } catch {}
+  for (const sel of sizeSelects) {
+    if (sel.offsetParent === null) continue;
+    const currentOpt = sel.options[sel.selectedIndex];
+    const isPlaceholder = !currentOpt || !currentOpt.value || /select|choose/i.test(currentOpt.text);
+    if (isPlaceholder) {
+      for (let i = 0; i < sel.options.length; i++) {
+        const opt = sel.options[i];
+        if (opt.value && !opt.disabled && !/select|choose/i.test(opt.text)) {
+          sel.selectedIndex = i;
+          sel.dispatchEvent(new Event('input', { bubbles: true }));
+          sel.dispatchEvent(new Event('change', { bubbles: true }));
+          return true;
+        }
+      }
+    }
   }
 
-  // 2. Check for standard e-commerce and brand-specific Add to Cart selectors
+  // 2. Check interactive size elements (Zara, Diesel, ASOS, Uniqlo, H&M, Shopify pill swatches)
+  const sizeElements = Array.from(
+    document.querySelectorAll<HTMLElement>(
+      [
+        'button[data-qa-action*="size"]:not([disabled])',
+        'button[data-qa-action="size-in-stock"]',
+        '.size-selector button:not([disabled])',
+        '.size-selector a:not([disabled])',
+        '[data-testid*="size"] button:not([disabled])',
+        '[data-test*="size"] button:not([disabled])',
+        'ul.sizes button:not([disabled])',
+        'ul.sizes li:not(.disabled):not(.out-of-stock) button',
+        '.swatches--size button:not([disabled])',
+        '.swatches.size button:not([disabled])',
+        '.swatches.size a:not([disabled])',
+        '[class*="size-picker" i] button:not([disabled])',
+        '[class*="size-selector" i] button:not([disabled])',
+        '[class*="size-attribute" i] button:not([disabled])',
+        '[data-attr="size"] button:not([disabled])',
+        '[data-attr="size"] a:not([disabled])',
+        '[role="radiogroup"] [role="radio"]:not([aria-disabled="true"])',
+        'input[type="radio"][name*="size" i]:not([disabled]) + label',
+        'input[type="radio"][name*="Size" i]:not([disabled]) + label',
+        '.product-form__input--pill input:not([disabled]) + label',
+      ].join(', ')
+    )
+  ).filter((el) => el.offsetParent !== null);
+
+  if (sizeElements.length > 0) {
+    const hasSelected = sizeElements.some((el) => {
+      if (el.classList.contains('active') || el.classList.contains('selected')) return true;
+      if (el.getAttribute('aria-checked') === 'true' || el.getAttribute('aria-selected') === 'true') return true;
+      if (el.hasAttribute('data-selected') || el.getAttribute('data-active') === 'true') return true;
+      const prev = el.previousElementSibling as HTMLInputElement | null;
+      if (prev && prev.tagName === 'INPUT' && prev.type === 'radio' && prev.checked) return true;
+      return false;
+    });
+
+    if (!hasSelected) {
+      const target = sizeElements[0];
+      target.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      const opts = { bubbles: true, cancelable: true, view: window };
+      target.dispatchEvent(new PointerEvent('pointerdown', opts));
+      target.dispatchEvent(new MouseEvent('mousedown', opts));
+      target.dispatchEvent(new PointerEvent('pointerup', opts));
+      target.dispatchEvent(new MouseEvent('mouseup', opts));
+      target.click();
+      return true;
+    }
+  }
+
+  return false;
+}
+
+function isClickableButton(el: HTMLElement): boolean {
+  if (el.offsetParent === null) return false;
+  if (el.hasAttribute('disabled')) return false;
+  if (el.classList.contains('disabled')) return false;
+  if (el.getAttribute('aria-disabled') === 'true') return false;
+  const style = window.getComputedStyle(el);
+  if (style.display === 'none' || style.visibility === 'hidden' || style.opacity === '0') return false;
+  return true;
+}
+
+function findAddToCartButton(): { btn: HTMLElement | null; disabledBtn: HTMLElement | null } {
   const selectors = [
     // Zara
     'button[data-qa-action="add-to-cart"]',
@@ -188,39 +309,46 @@ function triggerStoreAddToCart(): { success: boolean; message: string } {
     'button[data-add-to-cart]',
     '.add-to-cart-global button',
     '.add-to-cart-btn',
+    'button.add-to-cart-button',
     // Shopify & general
     'button[name="add"]',
     'form[action*="/cart/add"] button[type="submit"]',
     'form[action*="/cart/add"] input[type="submit"]',
     'button.product-form__submit',
+    '.product-form__cart-submit',
     '.add-to-cart',
     '.add-to-bag',
     '#add-to-cart-button',
     'button[id*="add-to-cart" i]',
     'button[id*="add-to-bag" i]',
+    'button[class*="add-to-cart" i]',
+    'button[class*="add-to-bag" i]',
     'button[aria-label*="add to bag" i]',
     'button[aria-label*="add to cart" i]',
     'button[aria-label*="add to basket" i]',
     'button[data-testid*="add-to-cart" i]',
     'button[data-testid*="add-to-bag" i]',
+    'button[data-test*="add-to-cart" i]',
+    'button[data-qa*="add-to-cart" i]',
   ];
 
   let btn: HTMLElement | null = null;
   let disabledBtn: HTMLElement | null = null;
 
   for (const sel of selectors) {
-    const el = document.querySelector<HTMLElement>(sel);
-    if (el && el.offsetParent !== null) {
-      if (!el.hasAttribute('disabled') && !el.classList.contains('disabled')) {
+    const elements = Array.from(document.querySelectorAll<HTMLElement>(sel));
+    for (const el of elements) {
+      if (el.id === 'fitmirror-tryon-badge' || el.closest('#fitmirror-avatar-root')) continue;
+      if (isClickableButton(el)) {
         btn = el;
         break;
-      } else {
+      } else if (el.offsetParent !== null) {
         disabledBtn = disabledBtn || el;
       }
     }
+    if (btn) break;
   }
 
-  // 3. Fallback: search all buttons on page by text content
   if (!btn) {
     const candidates = Array.from(
       document.querySelectorAll<HTMLElement>('button, a, input[type="submit"], div[role="button"]')
@@ -229,48 +357,126 @@ function triggerStoreAddToCart(): { success: boolean; message: string } {
       if (el.id === 'fitmirror-tryon-badge' || el.closest('#fitmirror-avatar-root')) continue;
       const text = (el.innerText || el.textContent || el.getAttribute('value') || '').trim();
       if (
-        /^(add to (bag|cart|basket)|añadir a la cesta|ajouter au panier|in den warenkorb|加入购物车)$/i.test(
+        /^(add to (bag|cart|basket)|añadir a la cesta|ajouter au panier|in den warenkorb|加入购物车|ใส่ตะกร้า)$/i.test(
           text
         ) ||
         (/add to (bag|cart|basket)/i.test(text) && text.length < 35)
       ) {
-        if (el.offsetParent !== null) {
-          if (!el.hasAttribute('disabled') && !el.classList.contains('disabled')) {
-            btn = el;
-            break;
-          } else {
-            disabledBtn = disabledBtn || el;
-          }
+        if (isClickableButton(el)) {
+          btn = el;
+          break;
+        } else if (el.offsetParent !== null) {
+          disabledBtn = disabledBtn || el;
         }
       }
     }
   }
 
-  if (!btn && disabledBtn) {
+  return { btn, disabledBtn };
+}
+
+function clickAddToCartButton(btn: HTMLElement) {
+  btn.focus();
+  btn.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  const opts = { bubbles: true, cancelable: true, view: window };
+  btn.dispatchEvent(new PointerEvent('pointerdown', opts));
+  btn.dispatchEvent(new MouseEvent('mousedown', opts));
+  btn.dispatchEvent(new PointerEvent('pointerup', opts));
+  btn.dispatchEvent(new MouseEvent('mouseup', opts));
+  btn.click();
+
+  const form = btn.closest('form');
+  if (form && (btn.getAttribute('type') === 'submit' || !btn.getAttribute('type'))) {
+    try {
+      form.requestSubmit(btn);
+    } catch {
+      try {
+        form.submit();
+      } catch {}
+    }
+  }
+}
+
+let autoCartActive = false;
+
+/** Poll and retry until the store button renders and is enabled */
+async function runAutoAddToCartWithRetry(
+  maxWaitMs = 10000
+): Promise<{ success: boolean; message: string }> {
+  if (autoCartActive) return { success: false, message: 'Already adding to cart...' };
+  autoCartActive = true;
+
+  showToastNotification('FitMirror: Adding item to shopping bag...', 3500);
+
+  const startTime = Date.now();
+  let sizeClicked = false;
+
+  while (Date.now() - startTime < maxWaitMs) {
+    if (!sizeClicked) {
+      const didSelect = autoSelectSizeIfRequired();
+      if (didSelect) {
+        sizeClicked = true;
+        await new Promise((r) => setTimeout(r, 400));
+      }
+    }
+
+    const { btn } = findAddToCartButton();
+    if (btn) {
+      clickAddToCartButton(btn);
+      showToastNotification('✓ Added to your shopping bag!', 4500, true);
+      autoCartActive = false;
+      return { success: true, message: 'Added to your store bag!' };
+    }
+
+    if (!sizeClicked) {
+      const didSelect = autoSelectSizeIfRequired();
+      if (didSelect) {
+        sizeClicked = true;
+        await new Promise((r) => setTimeout(r, 400));
+      }
+    }
+
+    await new Promise((r) => setTimeout(r, 400));
+  }
+
+  const { disabledBtn } = findAddToCartButton();
+  if (disabledBtn) {
+    disabledBtn.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    showToastNotification('FitMirror: Please select your size to finish adding to cart', 6000, false);
+    autoCartActive = false;
+    return {
+      success: false,
+      message: 'Please select your size on the store page to finish adding to cart.',
+    };
+  }
+
+  showToastNotification('FitMirror: Could not find "Add to Cart" button', 5000, false);
+  autoCartActive = false;
+  return {
+    success: false,
+    message: 'Could not find "Add to Cart" button on this store page.',
+  };
+}
+
+/** Automatically trigger the retailer's real "Add to Bag" / "Add to Cart" button */
+function triggerStoreAddToCart(): { success: boolean; message: string } {
+  autoSelectSizeIfRequired();
+  const { btn, disabledBtn } = findAddToCartButton();
+  if (btn) {
+    clickAddToCartButton(btn);
+    return { success: true, message: 'Added to your store bag!' };
+  }
+  if (disabledBtn) {
     disabledBtn.scrollIntoView({ behavior: 'smooth', block: 'center' });
     return {
       success: false,
       message: 'Please choose your size on the store page to finish adding to cart.',
     };
   }
-
-  if (!btn) {
-    return {
-      success: false,
-      message: 'Could not find "Add to Cart" button on this store page.',
-    };
-  }
-
-  btn.scrollIntoView({ behavior: 'smooth', block: 'center' });
-  try {
-    btn.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, cancelable: true, view: window }));
-    btn.dispatchEvent(new MouseEvent('mouseup', { bubbles: true, cancelable: true, view: window }));
-    btn.click();
-    return { success: true, message: 'Added to your store bag!' };
-  } catch {
-    btn.click();
-    return { success: true, message: 'Added to your store bag!' };
-  }
+  return {
+    success: false,
+    message: 'Could not find "Add to Cart" button on this store page.',
+  };
 }
 
 const SVG_MINIMIZE = `
@@ -1448,7 +1654,7 @@ function ensureAvatar() {
               void (async () => {
                 await toggleCart(item.id, true);
                 if (isCurrentPage(item.productUrl)) {
-                  const res = triggerStoreAddToCart();
+                  const res = await runAutoAddToCartWithRetry(6000);
                   if (res.success) {
                     infoMessage = res.message;
                     errorMessage = null;
@@ -1510,7 +1716,7 @@ function ensureAvatar() {
               // 1. If current page product is in the list, add it immediately on this page
               const onThisPage = figure.liked.some((i) => isCurrentPage(i.productUrl));
               if (onThisPage) {
-                triggerStoreAddToCart();
+                void runAutoAddToCartWithRetry(6000);
               }
 
               // 2. Open any other store items with autoAddToCart enabled
@@ -1877,19 +2083,28 @@ function ensureAvatar() {
     document.documentElement.append(badge);
   }
 
-  // Handle auto-add-to-cart flag when opened from "Put all into cart"
-  if (location.hash.includes('fitmirror_cart') || location.search.includes('fitmirror_cart')) {
-    try {
-      history.replaceState(null, '', location.href.replace(/[#&?]fitmirror_cart=1/, ''));
-    } catch {}
-    window.setTimeout(() => {
-      const res = triggerStoreAddToCart();
+  // Handle auto-add-to-cart flag when opened from "Put all into cart" or via storage coordination
+  async function checkPendingAutoCart() {
+    const isHash = location.hash.includes('fitmirror_cart') || location.search.includes('fitmirror_cart');
+    if (isHash) {
+      try {
+        history.replaceState(null, '', location.href.replace(/[#&?]fitmirror_cart=1/, ''));
+      } catch {}
+    }
+    const isStorage = await consumePendingCartAdd(location.href);
+
+    if (isHash || isStorage) {
+      const res = await runAutoAddToCartWithRetry(10000);
       if (res.success) {
         infoMessage = 'Automatically added to this store bag!';
-        void render();
+      } else {
+        errorMessage = res.message;
       }
-    }, 1200);
+      void render();
+    }
   }
+
+  void checkPendingAutoCart();
 
   chrome.storage.onChanged.addListener(() => {
     void render();

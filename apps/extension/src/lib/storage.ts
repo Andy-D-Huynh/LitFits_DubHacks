@@ -442,3 +442,80 @@ export async function removeBrowsedProduct(idOrUrl: string): Promise<FigurePersi
   await saveFigure(next);
   return next;
 }
+
+const PENDING_CART_KEY = 'fitmirror_pending_cart';
+
+interface PendingCartEntry {
+  url: string;
+  timestamp: number;
+}
+
+/** Record that a product URL should be automatically added to cart once loaded. */
+export async function markPendingCartAdd(url: string): Promise<void> {
+  try {
+    const store = await chrome.storage.local.get(PENDING_CART_KEY);
+    const list: PendingCartEntry[] = Array.isArray(store[PENDING_CART_KEY])
+      ? store[PENDING_CART_KEY]
+      : [];
+    const now = Date.now();
+    // Retain entries under 3 minutes old
+    const valid = list.filter((e) => typeof e === 'object' && e && now - e.timestamp < 180_000);
+    valid.push({ url, timestamp: now });
+    await chrome.storage.local.set({ [PENDING_CART_KEY]: valid });
+  } catch (err) {
+    console.error('Failed to mark pending cart add:', err);
+  }
+}
+
+/** Check if the current URL has a pending add-to-cart request and consume it. */
+export async function consumePendingCartAdd(currentUrl: string): Promise<boolean> {
+  try {
+    const store = await chrome.storage.local.get(PENDING_CART_KEY);
+    const list: PendingCartEntry[] = Array.isArray(store[PENDING_CART_KEY])
+      ? store[PENDING_CART_KEY]
+      : [];
+    if (list.length === 0) return false;
+
+    const now = Date.now();
+    let matched = false;
+    let curObj: URL | null = null;
+    try {
+      curObj = new URL(currentUrl);
+    } catch {}
+
+    const remaining: PendingCartEntry[] = [];
+    for (const entry of list) {
+      if (!entry || typeof entry.url !== 'string' || now - entry.timestamp > 180_000) {
+        continue;
+      }
+      if (!matched && curObj) {
+        try {
+          const entryObj = new URL(entry.url);
+          const curHost = curObj.hostname.replace(/^www\./, '').toLowerCase();
+          const entryHost = entryObj.hostname.replace(/^www\./, '').toLowerCase();
+          const curPath = curObj.pathname.replace(/\/$/, '').toLowerCase();
+          const entryPath = entryObj.pathname.replace(/\/$/, '').toLowerCase();
+
+          // Match hostname and path (or path prefix to account for store redirects/locales)
+          if (
+            curHost === entryHost &&
+            (curPath === entryPath || curPath.includes(entryPath) || entryPath.includes(curPath))
+          ) {
+            matched = true;
+            continue; // Consume this entry
+          }
+        } catch {}
+      }
+      remaining.push(entry);
+    }
+
+    if (matched || remaining.length !== list.length) {
+      await chrome.storage.local.set({ [PENDING_CART_KEY]: remaining });
+    }
+
+    return matched;
+  } catch (err) {
+    console.error('Failed to consume pending cart add:', err);
+    return false;
+  }
+}
