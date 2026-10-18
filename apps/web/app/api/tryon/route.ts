@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import { rememberLikedLink } from '@/lib/cart/liked-garments';
-import { renderFluxTryOn, type FitStyle } from '@/lib/tryon/flux-vto';
+import { renderNanoBananaTryOn, type FitStyle } from '@/lib/tryon/nano-banana';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -33,7 +33,7 @@ export async function POST(req: Request) {
 
   const body = parsed.data;
   try {
-    const imageUrl = await renderFluxTryOn({
+    const imageUrl = await renderNanoBananaTryOn({
       modelImage: body.modelImage,
       garmentImage: body.garmentImage,
       name: body.name,
