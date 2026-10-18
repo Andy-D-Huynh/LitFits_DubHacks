@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { HEIGHT_RANGE_CM, MEASUREMENT_RANGES_CM } from './fit-rules';
 
 // Canonical schemas. Types in types.ts are inferred from these; the SQL
 // migrations mirror them. Internal units are always cm.
@@ -215,5 +216,47 @@ export const IngestRequestSchema = z.object({
 
 export const FitRequestSchema = z.object({
   garmentId: z.uuid(),
+  profileId: z.uuid(),
+});
+
+// ---- Profile input (PUT /api/profile) ----
+
+const inRange = ([min, max]: readonly [number, number]) => z.number().min(min).max(max);
+
+export const ProfileInputSchema = z.object({
+  heightCm: inRange(HEIGHT_RANGE_CM),
+  fitPreference: FitPreferenceSchema.default('regular'),
+  measurements: z
+    .object({
+      shoulder_width: inRange(MEASUREMENT_RANGES_CM.shoulder_width).optional(),
+      chest: inRange(MEASUREMENT_RANGES_CM.chest).optional(),
+      waist: inRange(MEASUREMENT_RANGES_CM.waist).optional(),
+      hip: inRange(MEASUREMENT_RANGES_CM.hip).optional(),
+      inseam: inRange(MEASUREMENT_RANGES_CM.inseam).optional(),
+      arm_length: inRange(MEASUREMENT_RANGES_CM.arm_length).optional(),
+    })
+    .strict(),
+});
+
+// ---- Outfits API ----
+
+export const OutfitWithItemsSchema = OutfitSchema.extend({ items: z.array(OutfitItemSchema) });
+
+export const CreateOutfitSchema = z.object({
+  profileId: z.uuid(),
+  name: z.string().trim().min(1).max(80).optional(),
+});
+
+// Omitted size → the fit engine's recommended size for the caller.
+export const OutfitItemInputSchema = z.object({
+  garmentId: z.uuid(),
+  size: z.string().min(1).max(20).optional(),
+});
+
+// ---- Try-on API ----
+
+// One garment per slot; up to dress/top + bottom + outerwear (or top + bottom + outerwear).
+export const TryOnRequestSchema = z.object({
+  garmentIds: z.array(z.uuid()).min(1).max(3),
   profileId: z.uuid(),
 });

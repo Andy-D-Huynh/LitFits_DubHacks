@@ -1,7 +1,7 @@
 import { readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { GarmentFixtureSchema } from '../packages/shared/src/schemas';
+import { GarmentFixtureSchema, ProfileSchema } from '../packages/shared/src/schemas';
 
 const dir = join(import.meta.dirname, 'garments');
 const files = readdirSync(dir).filter((f) => f.endsWith('.json'));
@@ -28,5 +28,12 @@ describe('garment fixtures', () => {
       counts[category] = (counts[category] ?? 0) + 1;
     }
     expect(counts).toEqual({ top: 3, bottom: 3, outerwear: 1, dress: 1 });
+  });
+});
+
+describe('profile fixtures', () => {
+  it('demo profile matches ProfileSchema', () => {
+    const data = JSON.parse(readFileSync(join(import.meta.dirname, 'profiles/demo.json'), 'utf8'));
+    expect(ProfileSchema.safeParse(data).error?.issues ?? []).toEqual([]);
   });
 });

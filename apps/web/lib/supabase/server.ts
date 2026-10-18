@@ -36,3 +36,8 @@ export function createSupabaseAdminClient() {
   if (!serviceKey) throw new Error('SUPABASE_SERVICE_ROLE_KEY is not set');
   return createClient(url, serviceKey, { auth: { persistSession: false } });
 }
+
+export function isSupabaseConfigured(): boolean {
+  const e = env();
+  return Boolean(e.NEXT_PUBLIC_SUPABASE_URL && e.NEXT_PUBLIC_SUPABASE_ANON_KEY);
+}

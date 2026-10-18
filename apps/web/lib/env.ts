@@ -11,6 +11,7 @@ const ServerEnvSchema = z.object({
   NEXT_PUBLIC_SUPABASE_ANON_KEY: optional,
   SUPABASE_SERVICE_ROLE_KEY: optional,
   ANTHROPIC_API_KEY: optional,
+  LLM_PROVIDER: z.enum(['anthropic', 'mock']).default('mock'),
   LLM_MODEL: optional,
   TRYON_PROVIDER: z.enum(['replicate', 'gemini', 'mock']).default('mock'),
   REPLICATE_API_TOKEN: optional,

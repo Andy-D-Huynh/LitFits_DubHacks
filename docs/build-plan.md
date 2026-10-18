@@ -58,3 +58,55 @@ Answer these and the defaults in the docs get replaced. Write answers inline and
 - **Supabase:** hosted project. Keys go in `apps/web/.env.local` (never committed).
 - **Deploy:** Vercel, project root `apps/web`.
 - **Package scope:** `@fitmirror/*` (`@fitmirror/shared`, `@fitmirror/web`, `@fitmirror/extension`).
+
+## Decisions log (back-end lane)
+
+Running list of defaults taken under the Working mode in CLAUDE.md. Each one is also recorded in the doc for its area.
+
+### Step 1: M1 fixes (2026-10-17)
+- "Tight beats loose" is defined as a ranking: overall verdict (good > loose > tight > unknown), then no tight critical dim, then score. See `fit-engine.md` § M1 fixes.
+- Center-of-band tie-break uses the main dim (chest for top/outerwear/dress, waist for bottom); fit preference only breaks a remaining tie.
+- The "no size fits well" warning still returns the closest size as `recommendedSize`; it doesn't null it out.
+- Outerwear offset: chest +6, waist +6, shoulder +1 cm on garment charts only. Numbers are guesses, tunable in `fit-rules.ts`.
+
+### Step 2: Profile (2026-10-17)
+- Routes accept the cookie session or `Authorization: Bearer`. Bearer is what the extension will use after pairing, and what the live smoke test uses.
+- One profile per user, enforced in code (the most recent row wins); no unique constraint, to avoid a migration.
+- `PUT /api/profile` is the only route that signs a visitor in anonymously. It returns 503 with the reason if anonymous sign-in is disabled in Supabase Auth settings.
+- Manual entry validates against plausible adult ranges (`HEIGHT_RANGE_CM`, `MEASUREMENT_RANGES_CM` in `fit-rules.ts`); out-of-range values are rejected as typos.
+- Centimeters only in the form until question 8 is answered.
+- Demo mode: `GET` serves `fixtures/profiles/demo.json`; `PUT` echoes the edits without saving.
+- Middleware only refreshes the session when an `sb-` cookie exists and demo mode is off, so first visits and demos never wait on Supabase.
+- `/studio` reads the profile (or the demo profile) and lists garments from the DB (fixtures in demo); `hardcoded-body.ts` is gone. `fixtures/` is traced into the server bundle for runtime reads on Vercel.
+
+### Step 3: Fit API (2026-10-17)
+- `POST /api/fit` needs a signed-in caller; another user's profile id returns 404 (RLS hides it), not 403, so ids don't leak.
+- `GET /api/garments/:id` is public (shared catalog). Bad ids → 400, unknown → 404.
+- Demo mode: `POST /api/fit?demo=1` only accepts the demo profile id and fixture garments.
+
+### Step 4: Outfit API (2026-10-17)
+- Slot rules live in `packages/shared/src/outfit-rules.ts` (pure, unit-tested) so the partner's client store and the server apply identical rules.
+- Responses return `removed: OutfitEntry[]` instead of a single `replacedGarmentId`, since adding a dress can replace two items.
+- An omitted `size` defaults to the fit engine's recommended size; a size not in the garment's chart is a 400.
+- Removing `top` or `bottom` while a dress is worn removes the dress (the dress fills both slots).
+- Layer position: dress/top 0, bottom 1, outerwear 2.
+- Writes are a delete-then-upsert diff, not a transaction (supabase-js has none). The client reverts its optimistic state on an error, per outfit-editing.md.
+- Demo mode: outfit routes return 409; the client keeps outfits locally with the shared rules.
+- Each response includes `fits` per slot and an outfit-level `summary` ("Top fits, bottom is tight at the waist.").
+
+### Step 5: Try-on pipeline (2026-10-17)
+- Chain seed is the model photo path or `profile:<id>`; each layer gets its own render row so prefixes are cache hits. Details in `tryon.md` § Implementation.
+- Queue runs with Next's `after()` (in-process, no external queue service). Stale in-flight rows (>2 min) and failed rows are requeued.
+- `garmentIds` takes 1–3 garments, one per slot (same clash rules as outfits); an empty outfit is the client showing the bare model photo, not a render.
+- Mock person image is the placeholder; a real provider requires a model photo (409) and product images (422).
+- `ReplicateTryOn` is written but untested (no key); Gemini isn't implemented and throws if selected.
+- Try-on on Vercel needs `SUPABASE_SERVICE_ROLE_KEY`, which is on hold until M2 (ingest). Until then the deployed route returns 503 outside demo mode.
+
+### Step 6: Ingest API (2026-10-17)
+- `LLM_PROVIDER` (`mock` default | `anthropic`) gates the LLM, mirroring `TRYON_PROVIDER`, so having an API key in the env never triggers spend by itself.
+- The mock normalizer is a real deterministic DOM path (JSON-LD + table parser), not a stub, so ingest works offline and in demos. It refuses to guess a chart's unit.
+- LLM model defaults to `claude-opus-5-5` when `LLM_MODEL` is unset. No server-side refusal fallback is configured; a refusal returns 502 and the caller can retry or use the manual form.
+- Ingest is unauthenticated (shared catalog) but rate-limited per IP in memory; per-instance limits are acceptable for the hackathon.
+- URL canonicalization keeps variant query params (e.g. `color`) and drops tracking params, so different colorways stay separate garments.
+- Screenshot ingest returns 501; the vision fallback is not built.
+- Ingest needs `SUPABASE_SERVICE_ROLE_KEY` on Vercel (planned for M2, per the earlier decision to hold it).

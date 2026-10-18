@@ -1,0 +1,26 @@
+{
+  "id": "00000000-0000-4000-8000-0000000000d1",
+  "userId": "00000000-0000-4000-8000-0000000000d0",
+  "heightCm": 178,
+  "fitPreference": "regular",
+  "measurements": {
+    "chest": 98,
+    "waist": 84,
+    "hip": 99,
+    "shoulder_width": 46,
+    "inseam": 81,
+    "arm_length": 63
+  },
+  "measurementSource": {
+    "chest": "manual",
+    "waist": "manual",
+    "hip": "manual",
+    "shoulder_width": "manual",
+    "inseam": "manual",
+    "arm_length": "manual"
+  },
+  "confidence": null,
+  "modelPhotoPath": null,
+  "faceOptIn": false,
+  "createdAt": "2026-10-17T00:00:00+00:00"
+}

@@ -154,6 +154,9 @@ type FitResult = {
 - `POST /api/capture-sessions` → `{ id, qrUrl }`. Phone opens `qrUrl`.
 - `POST /api/capture-sessions/:id/complete` takes height, measurements, confidence, model photo upload path. Broadcasts over Realtime so the desktop updates live.
 - `PUT /api/profile` creates or updates the profile (manual edits set source to `manual`).
+- `GET /api/profile` returns the caller's profile (404 if none yet). One profile per user: the most recent row.
+
+**Auth for all routes:** the web app's Supabase cookie session, or `Authorization: Bearer <access token>` (extension, scripts). The first `PUT /api/profile` without a session signs the visitor in anonymously. `?demo=1` or `DEMO_MODE=true` serves fixtures with no auth or network.
 
 **Garments and fit**
 - `POST /api/garments/ingest` takes `source` (extension | url | screenshot), `url`, `title`, `jsonld`, `imageUrls`, `chartHtml` (max 20,000 chars, style/class/script stripped by the extension), `pageText` (max 8000 chars), optional screenshot path. Returns `Garment`. Idempotent on `source_url`.
@@ -166,10 +169,12 @@ type FitResult = {
 - `GET /api/tryon/:id` → status and signed image URL.
 
 **Outfits**
-- CRUD `/api/outfits`.
-- `POST /api/outfits/:id/items` takes `garmentId`, `size`. Adds the item; if the slot is occupied it swaps and returns `replacedGarmentId` so the client can offer Undo.
-- `PATCH /api/outfits/:id/items/:slot` takes `garmentId`, `size`. Swaps the garment or changes the size in place, keeping layer position. Returns the updated outfit and a `FitResult` per item.
-- `DELETE /api/outfits/:id/items/:slot` removes the item in that slot; a dress clears both top and bottom.
+- `GET/POST /api/outfits` (create takes `profileId`, optional `name`), `GET/DELETE /api/outfits/:id`.
+- `POST /api/outfits/:id/items` takes `garmentId`, optional `size` (default: the fit engine's recommended size). Adds the item to the slot for its category; an occupied slot or a dress vs top/bottom clash is a swap.
+- `PATCH /api/outfits/:id/items/:slot` takes `garmentId`, optional `size`. Swaps the garment or changes the size in place, keeping layer position. 400 if the garment's category doesn't match the slot, 404 if the slot is empty.
+- `DELETE /api/outfits/:id/items/:slot` empties the slot; removing top or bottom while a dress is worn removes the dress.
+- Every outfit response is `{ outfit, fits: { [slot]: FitResult }, summary, removed? }`. `removed` lists the replaced entries (a dress can replace two) so the client can offer Undo. Slot rules are pure functions in `packages/shared/src/outfit-rules.ts`, shared with the client store.
+- In demo mode the outfit routes return 409: the client store is the source of truth and uses the same shared rules.
 
 **Checkout**
 - `POST /api/checkout/session` takes `outfitId` → `{ orderId, clientData }`.
@@ -182,7 +187,8 @@ NEXT_PUBLIC_SUPABASE_URL
 NEXT_PUBLIC_SUPABASE_ANON_KEY
 SUPABASE_SERVICE_ROLE_KEY
 ANTHROPIC_API_KEY
-LLM_MODEL
+LLM_PROVIDER          # anthropic | mock (default mock)
+LLM_MODEL             # default claude-opus-5-5
 TRYON_PROVIDER        # replicate | gemini | mock
 REPLICATE_API_TOKEN
 TRYON_MODEL

@@ -52,6 +52,7 @@ Layout and data model: `docs/architecture.md`.
 - Extension: `pnpm --filter @fitmirror/extension build`, then load `apps/extension/dist` unpacked at `chrome://extensions` (or `dev` for HMR on port 5173)
 - Env: copy `apps/web/.env.example` to `apps/web/.env.local`
 - DB: apply `supabase/migrations/*.sql` in order, then `pnpm --filter @fitmirror/web seed` loads `fixtures/garments/` (needs the service role key)
+- Live API smoke test: with the dev server running, `pnpm --filter @fitmirror/web smoke` (creates and deletes throwaway users; needs the service role key)
 - Demo mode: `DEMO_MODE=true` env, or `?demo=1` in the URL
 
 ## Owners
@@ -78,3 +79,9 @@ Once code exists, code wins over docs: `packages/shared/src/types.ts`, `schemas.
 | `docs/ui.md` | Studio, compare, checkout pages, components, 3D figure |
 | `docs/checkout-privacy.md` | Payment provider, VISA sandbox, privacy and security |
 | `docs/build-plan.md` | Milestones, acceptance criteria, open questions |
+
+
+## Working mode
+When a spec gap has a reasonable default, pick it, record it in the relevant doc, and keep going.
+Only stop to ask for: irreversible changes, anything that touches a teammate's area (studio UI, extension UI, 3D), adding paid services, or pushing to main.
+Commit after each milestone with tests passing. Work on feature branches; never push to main.
