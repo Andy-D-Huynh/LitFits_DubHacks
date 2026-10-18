@@ -169,10 +169,12 @@ type FitResult = {
 - `GET /api/tryon/:id` → status and signed image URL.
 
 **Outfits**
-- CRUD `/api/outfits`.
-- `POST /api/outfits/:id/items` takes `garmentId`, `size`. Adds the item; if the slot is occupied it swaps and returns `replacedGarmentId` so the client can offer Undo.
-- `PATCH /api/outfits/:id/items/:slot` takes `garmentId`, `size`. Swaps the garment or changes the size in place, keeping layer position. Returns the updated outfit and a `FitResult` per item.
-- `DELETE /api/outfits/:id/items/:slot` removes the item in that slot; a dress clears both top and bottom.
+- `GET/POST /api/outfits` (create takes `profileId`, optional `name`), `GET/DELETE /api/outfits/:id`.
+- `POST /api/outfits/:id/items` takes `garmentId`, optional `size` (default: the fit engine's recommended size). Adds the item to the slot for its category; an occupied slot or a dress vs top/bottom clash is a swap.
+- `PATCH /api/outfits/:id/items/:slot` takes `garmentId`, optional `size`. Swaps the garment or changes the size in place, keeping layer position. 400 if the garment's category doesn't match the slot, 404 if the slot is empty.
+- `DELETE /api/outfits/:id/items/:slot` empties the slot; removing top or bottom while a dress is worn removes the dress.
+- Every outfit response is `{ outfit, fits: { [slot]: FitResult }, summary, removed? }`. `removed` lists the replaced entries (a dress can replace two) so the client can offer Undo. Slot rules are pure functions in `packages/shared/src/outfit-rules.ts`, shared with the client store.
+- In demo mode the outfit routes return 409: the client store is the source of truth and uses the same shared rules.
 
 **Checkout**
 - `POST /api/checkout/session` takes `outfitId` → `{ orderId, clientData }`.

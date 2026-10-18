@@ -161,6 +161,139 @@ async function fitChecks(token: string, otherToken: string, profileId: string) {
   );
 }
 
+const G = {
+  tee: '00000000-0000-4000-8000-000000000001',
+  oxford: '00000000-0000-4000-8000-000000000002',
+  chino: '00000000-0000-4000-8000-000000000005',
+  jacket: '00000000-0000-4000-8000-000000000007',
+  dress: '00000000-0000-4000-8000-000000000008',
+};
+
+type OutfitBody = {
+  outfit: {
+    id: string;
+    items: { slot: string; garmentId: string; selectedSize: string | null; position: number }[];
+  };
+  removed?: { slot: string; garmentId: string }[];
+  summary: string;
+  fits: Record<string, unknown>;
+};
+
+async function outfitChecks(token: string, otherToken: string, profileId: string) {
+  const created = await call(token, 'POST', '/api/outfits', { profileId, name: 'Smoke' });
+  const o = created.json as unknown as OutfitBody;
+  check(
+    'POST /api/outfits → 201 empty outfit',
+    created.status === 201 && o.outfit.items.length === 0,
+    created,
+  );
+  const id = o.outfit.id;
+  const items = `/api/outfits/${id}/items`;
+  const slots = (r: { json: unknown }) =>
+    (r.json as OutfitBody).outfit.items
+      .map((i) => `${i.slot}:${i.garmentId.slice(-1)}:${i.selectedSize}`)
+      .join(',');
+
+  const tee = await call(token, 'POST', items, { garmentId: G.tee });
+  const teeBody = tee.json as unknown as OutfitBody;
+  check(
+    'add tee with no size → recommended size, top slot',
+    tee.status === 200 &&
+      teeBody.outfit.items[0]?.slot === 'top' &&
+      teeBody.outfit.items[0]?.selectedSize !== null,
+    tee.json,
+  );
+  check(
+    'add returns fits and a summary',
+    Boolean(teeBody.fits.top) && teeBody.summary.length > 0,
+    teeBody.summary,
+  );
+
+  const chino = await call(token, 'POST', items, { garmentId: G.chino, size: 'L' });
+  check(
+    'add chino → top and bottom',
+    chino.status === 200 && (chino.json as unknown as OutfitBody).outfit.items.length === 2,
+    slots(chino),
+  );
+
+  const badSize = await call(token, 'POST', items, { garmentId: G.tee, size: 'XXXL' });
+  check('size not in chart → 400', badSize.status === 400, badSize.json);
+
+  const dress = await call(token, 'POST', items, { garmentId: G.dress, size: 'M' });
+  const dressBody = dress.json as unknown as OutfitBody;
+  check(
+    'add dress replaces top and bottom',
+    dress.status === 200 && slots(dress) === 'dress:8:M' && dressBody.removed?.length === 2,
+    { items: slots(dress), removed: dressBody.removed },
+  );
+
+  const back = await call(token, 'POST', items, { garmentId: G.tee, size: 'M' });
+  check(
+    'add top replaces the dress',
+    slots(back) === 'top:1:M' &&
+      (back.json as unknown as OutfitBody).removed?.[0]?.slot === 'dress',
+    slots(back),
+  );
+
+  const swap = await call(token, 'PATCH', `${items}/top`, { garmentId: G.oxford, size: 'M' });
+  const swapBody = swap.json as unknown as OutfitBody;
+  check(
+    'PATCH swaps in place, keeping position',
+    swap.status === 200 &&
+      slots(swap) === 'top:2:M' &&
+      swapBody.outfit.items[0]?.position === 0 &&
+      swapBody.removed?.[0]?.garmentId === G.tee,
+    slots(swap),
+  );
+  const resize = await call(token, 'PATCH', `${items}/top`, { garmentId: G.oxford, size: 'L' });
+  check('PATCH same garment changes size', slots(resize) === 'top:2:L', slots(resize));
+  const wrong = await call(token, 'PATCH', `${items}/top`, { garmentId: G.chino, size: 'L' });
+  check('PATCH with the wrong category → 400', wrong.status === 400, wrong.status);
+  const empty = await call(token, 'PATCH', `${items}/bottom`, { garmentId: G.chino, size: 'L' });
+  check('PATCH an empty slot → 404', empty.status === 404, empty.status);
+
+  const coat = await call(token, 'POST', items, { garmentId: G.jacket, size: 'M' });
+  check('add outerwear layers on top', slots(coat) === 'top:2:L,outerwear:7:M', slots(coat));
+  const off = await call(token, 'DELETE', `${items}/outerwear`);
+  check('DELETE outerwear → removed', off.status === 200 && slots(off) === 'top:2:L', slots(off));
+  const none = await call(token, 'DELETE', `${items}/bottom`);
+  check('DELETE an empty slot → 404', none.status === 404, none.status);
+
+  await call(token, 'POST', items, { garmentId: G.dress, size: 'M' });
+  const dressOff = await call(token, 'DELETE', `${items}/bottom`);
+  check(
+    'DELETE bottom while a dress is worn removes the dress',
+    slots(dressOff) === '',
+    slots(dressOff),
+  );
+
+  const peek = await call(otherToken, 'GET', `/api/outfits/${id}`);
+  check("another user can't read the outfit → 404", peek.status === 404, peek.status);
+  const poke = await call(otherToken, 'POST', items, { garmentId: G.tee });
+  check("another user can't add to the outfit → 404", poke.status === 404, poke.status);
+  const steal = await call(otherToken, 'POST', '/api/outfits', { profileId });
+  check(
+    "another user can't create an outfit on this profile → 404",
+    steal.status === 404,
+    steal.status,
+  );
+
+  const list = await call(token, 'GET', '/api/outfits');
+  check(
+    'GET /api/outfits lists it',
+    list.status === 200 && Array.isArray(list.json) && list.json.length === 1,
+    list.status,
+  );
+  const demo = await call(null, 'GET', '/api/outfits?demo=1');
+  check('outfit routes in demo mode → 409', demo.status === 409, demo.status);
+  const del = await call(token, 'DELETE', `/api/outfits/${id}`);
+  const gone = await call(token, 'GET', `/api/outfits/${id}`);
+  check('DELETE outfit → 204, then 404', del.status === 204 && gone.status === 404, [
+    del.status,
+    gone.status,
+  ]);
+}
+
 const steps = (process.argv[3] ?? 'all').split(',');
 const users = [await newUser(), await newUser()];
 try {
@@ -170,6 +303,8 @@ try {
   ];
   const profileId = await profileChecks(a.token, b.token);
   if (steps.includes('all') || steps.includes('fit')) await fitChecks(a.token, b.token, profileId);
+  if (steps.includes('all') || steps.includes('outfit'))
+    await outfitChecks(a.token, b.token, profileId);
 } finally {
   const ids = [...users.map((u) => u.id), ...cleanupUserIds];
   for (const id of ids) await admin.auth.admin.deleteUser(id);

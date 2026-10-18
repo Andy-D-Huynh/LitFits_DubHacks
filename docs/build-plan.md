@@ -83,3 +83,13 @@ Running list of defaults taken under the Working mode in CLAUDE.md. Each one is 
 - `POST /api/fit` needs a signed-in caller; another user's profile id returns 404 (RLS hides it), not 403, so ids don't leak.
 - `GET /api/garments/:id` is public (shared catalog). Bad ids → 400, unknown → 404.
 - Demo mode: `POST /api/fit?demo=1` only accepts the demo profile id and fixture garments.
+
+### Step 4: Outfit API (2026-10-17)
+- Slot rules live in `packages/shared/src/outfit-rules.ts` (pure, unit-tested) so the partner's client store and the server apply identical rules.
+- Responses return `removed: OutfitEntry[]` instead of a single `replacedGarmentId`, since adding a dress can replace two items.
+- An omitted `size` defaults to the fit engine's recommended size; a size not in the garment's chart is a 400.
+- Removing `top` or `bottom` while a dress is worn removes the dress (the dress fills both slots).
+- Layer position: dress/top 0, bottom 1, outerwear 2.
+- Writes are a delete-then-upsert diff, not a transaction (supabase-js has none). The client reverts its optimistic state on an error, per outfit-editing.md.
+- Demo mode: outfit routes return 409; the client keeps outfits locally with the shared rules.
+- Each response includes `fits` per slot and an outfit-level `summary` ("Top fits, bottom is tight at the waist.").

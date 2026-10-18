@@ -369,7 +369,7 @@ const PLACE: Partial<Record<Dim, string>> = {
   shoulder: 'the shoulders',
 };
 
-function problemPhrase({ dim, verdict }: { dim: Dim; verdict: FitVerdict }): string {
+export function problemPhrase({ dim, verdict }: { dim: Dim; verdict: FitVerdict }): string {
   if (dim === 'inseam') return `${verdictWord(dim, verdict)} in the inseam`;
   return `${verdict} at ${PLACE[dim] ?? LABEL[dim].toLowerCase()}`;
 }

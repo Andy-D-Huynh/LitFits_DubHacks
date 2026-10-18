@@ -237,3 +237,18 @@ export const ProfileInputSchema = z.object({
     })
     .strict(),
 });
+
+// ---- Outfits API ----
+
+export const OutfitWithItemsSchema = OutfitSchema.extend({ items: z.array(OutfitItemSchema) });
+
+export const CreateOutfitSchema = z.object({
+  profileId: z.uuid(),
+  name: z.string().trim().min(1).max(80).optional(),
+});
+
+// Omitted size → the fit engine's recommended size for the caller.
+export const OutfitItemInputSchema = z.object({
+  garmentId: z.uuid(),
+  size: z.string().min(1).max(20).optional(),
+});
