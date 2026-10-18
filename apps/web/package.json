@@ -12,6 +12,7 @@
     "smoke": "tsx --env-file-if-exists=.env.local scripts/smoke-api.ts"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.135.0",
     "@fitmirror/shared": "workspace:*",
     "@supabase/ssr": "^0.12.7",
     "@supabase/supabase-js": "^2.118.0",

@@ -101,3 +101,12 @@ Running list of defaults taken under the Working mode in CLAUDE.md. Each one is 
 - Mock person image is the placeholder; a real provider requires a model photo (409) and product images (422).
 - `ReplicateTryOn` is written but untested (no key); Gemini isn't implemented and throws if selected.
 - Try-on on Vercel needs `SUPABASE_SERVICE_ROLE_KEY`, which is on hold until M2 (ingest). Until then the deployed route returns 503 outside demo mode.
+
+### Step 6: Ingest API (2026-10-17)
+- `LLM_PROVIDER` (`mock` default | `anthropic`) gates the LLM, mirroring `TRYON_PROVIDER`, so having an API key in the env never triggers spend by itself.
+- The mock normalizer is a real deterministic DOM path (JSON-LD + table parser), not a stub, so ingest works offline and in demos. It refuses to guess a chart's unit.
+- LLM model defaults to `claude-opus-5-5` when `LLM_MODEL` is unset. No server-side refusal fallback is configured; a refusal returns 502 and the caller can retry or use the manual form.
+- Ingest is unauthenticated (shared catalog) but rate-limited per IP in memory; per-instance limits are acceptable for the hackathon.
+- URL canonicalization keeps variant query params (e.g. `color`) and drops tracking params, so different colorways stay separate garments.
+- Screenshot ingest returns 501; the vision fallback is not built.
+- Ingest needs `SUPABASE_SERVICE_ROLE_KEY` on Vercel (planned for M2, per the earlier decision to hold it).

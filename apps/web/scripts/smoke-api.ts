@@ -349,6 +349,76 @@ async function tryonChecks(token: string, otherToken: string, profileId: string)
   );
 }
 
+async function ingestChecks() {
+  const url = `https://smoke.test/p/${randomUUID()}`;
+  const page = {
+    source: 'extension',
+    url: `${url}?utm_source=smoke#reviews`,
+    jsonld: {
+      '@type': 'Product',
+      name: 'Smoke Slim Oxford Shirt',
+      brand: { name: 'Smoke Co' },
+      image: ['https://smoke.test/oxford.jpg'],
+      offers: { price: '49.00', priceCurrency: 'USD' },
+    },
+    chartHtml:
+      '<table><tr><th>Size</th><th>Chest (cm)</th><th>Waist (cm)</th></tr><tr><td>M</td><td>96-100</td><td>82-86</td></tr></table>',
+    pageText: '100% cotton. Slim fit.',
+  };
+  try {
+    const created = await call(null, 'POST', '/api/garments/ingest', page);
+    check(
+      'POST /api/garments/ingest → 201 with a parsed chart',
+      created.status === 201 &&
+        created.json.sourceUrl === url &&
+        created.json.category === 'top' &&
+        created.json.fitType === 'slim' &&
+        created.json.extractionMethod === 'dom' &&
+        (created.json.sizeChart as { rows: unknown[] } | null)?.rows.length === 1,
+      created.json,
+    );
+    const again = await call(null, 'POST', '/api/garments/ingest', { ...page, url });
+    check(
+      'ingesting the same page again is idempotent → 200 same id',
+      again.status === 200 && again.json.id === created.json.id,
+      [again.status, again.json.id, created.json.id],
+    );
+    const shoes = await call(null, 'POST', '/api/garments/ingest', {
+      source: 'extension',
+      url: `https://smoke.test/p/${randomUUID()}`,
+      title: 'Leather Chelsea Boots',
+    });
+    check('unsupported category → 422', shoes.status === 422, shoes.status);
+    const bad = await call(null, 'POST', '/api/garments/ingest', { source: 'extension' });
+    check('invalid body → 400', bad.status === 400, bad.status);
+    const shot = await call(null, 'POST', '/api/garments/ingest', { source: 'screenshot', url });
+    check('screenshot source → 501', shot.status === 501, shot.status);
+    const demo = await call(null, 'POST', '/api/garments/ingest?demo=1', {
+      ...page,
+      url: `https://smoke.test/p/demo-${randomUUID()}`,
+    });
+    check('demo ingest returns a garment without saving', demo.status === 201, demo.status);
+    const preflight = await fetch(`${base}/api/garments/ingest`, {
+      method: 'OPTIONS',
+      headers: { origin: 'chrome-extension://abcdefghijklmnop' },
+    });
+    check(
+      'CORS preflight allows the extension origin',
+      preflight.status === 204 &&
+        preflight.headers.get('access-control-allow-origin') ===
+          'chrome-extension://abcdefghijklmnop',
+      preflight.status,
+    );
+  } finally {
+    const { data } = await admin
+      .from('garments')
+      .delete()
+      .like('source_url', 'https://smoke.test/%')
+      .select('id');
+    console.log(`cleaned up ${data?.length ?? 0} smoke garments`);
+  }
+}
+
 const steps = (process.argv[3] ?? 'all').split(',');
 const users = [await newUser(), await newUser()];
 try {
@@ -362,6 +432,7 @@ try {
     await outfitChecks(a.token, b.token, profileId);
   if (steps.includes('all') || steps.includes('tryon'))
     await tryonChecks(a.token, b.token, profileId);
+  if (steps.includes('all') || steps.includes('ingest')) await ingestChecks();
 } finally {
   const ids = [...users.map((u) => u.id), ...cleanupUserIds];
   for (const id of ids) await admin.auth.admin.deleteUser(id);

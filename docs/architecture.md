@@ -187,7 +187,8 @@ NEXT_PUBLIC_SUPABASE_URL
 NEXT_PUBLIC_SUPABASE_ANON_KEY
 SUPABASE_SERVICE_ROLE_KEY
 ANTHROPIC_API_KEY
-LLM_MODEL
+LLM_PROVIDER          # anthropic | mock (default mock)
+LLM_MODEL             # default claude-opus-5-5
 TRYON_PROVIDER        # replicate | gemini | mock
 REPLICATE_API_TOKEN
 TRYON_MODEL
