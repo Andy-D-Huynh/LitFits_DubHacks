@@ -97,11 +97,17 @@ export const GarmentSchema = z.object({
   sizeChart: SizeChartSchema.nullable(),
   extractionMethod: ExtractionMethodSchema,
   extractionConfidence: z.number().min(0).max(1).nullable(),
+  // True only for seeded fixtures whose charts are not verified retailer data.
+  isPlaceholder: z.boolean(),
   createdAt: z.iso.datetime({ offset: true }),
 });
 
 // fixtures/garments/*.json. Ids are fixed so demo mode and the seeded DB agree.
-export const GarmentFixtureSchema = GarmentSchema.omit({ createdAt: true }).extend({
+// The file's `placeholder` key maps to Garment.isPlaceholder.
+export const GarmentFixtureSchema = GarmentSchema.omit({
+  createdAt: true,
+  isPlaceholder: true,
+}).extend({
   extractionMethod: z.literal('fixture'),
   placeholder: z.boolean(),
 });

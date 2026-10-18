@@ -22,6 +22,7 @@ export type GarmentRow = {
   size_chart: Garment['sizeChart'];
   extraction_method: Garment['extractionMethod'];
   extraction_confidence: number | null;
+  is_placeholder: boolean;
   created_at: string;
 };
 
@@ -45,6 +46,7 @@ export function garmentToRow(g: Omit<Garment, 'createdAt'>): Omit<GarmentRow, 'c
     size_chart: g.sizeChart,
     extraction_method: g.extractionMethod,
     extraction_confidence: g.extractionConfidence,
+    is_placeholder: g.isPlaceholder,
   };
 }
 
@@ -70,6 +72,7 @@ export function rowToGarment(row: GarmentRow): Garment {
     extractionMethod: row.extraction_method,
     extractionConfidence:
       row.extraction_confidence === null ? null : Number(row.extraction_confidence),
+    isPlaceholder: row.is_placeholder,
     createdAt: row.created_at,
   });
 }
