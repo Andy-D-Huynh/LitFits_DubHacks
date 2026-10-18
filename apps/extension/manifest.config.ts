@@ -1,21 +1,19 @@
 import { defineManifest } from '@crxjs/vite-plugin';
 import pkg from './package.json' with { type: 'json' };
 
-// Permissions per docs/ingestion-extension.md. Retailer host_permissions get
-// added once the demo retailers are chosen (build-plan.md question 5).
 export default defineManifest({
   manifest_version: 3,
   name: 'FitMirror',
-  description: 'See which size fits you, and how it looks on you.',
+  description: 'Persistent fitting figure. Reads the clothing product page you have open.',
   version: pkg.version,
-  permissions: ['activeTab', 'storage', 'sidePanel', 'scripting'],
+  permissions: ['activeTab', 'storage', 'sidePanel', 'scripting', 'tabs'],
+  host_permissions: ['https://*/*', 'http://*/*'],
   action: { default_title: 'Open FitMirror' },
   background: { service_worker: 'src/background/index.ts', type: 'module' },
   side_panel: { default_path: 'src/sidepanel/index.html' },
   content_scripts: [
     {
-      // Generic script: it only activates on pages with JSON-LD Product (M2).
-      matches: ['https://*/*'],
+      matches: ['https://*/*', 'http://*/*'],
       js: ['src/content/index.ts'],
       run_at: 'document_idle',
     },
