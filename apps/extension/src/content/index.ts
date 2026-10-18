@@ -144,7 +144,28 @@ function isCurrentPage(url: string): boolean {
 
 /** Automatically trigger the retailer's real "Add to Bag" / "Add to Cart" button */
 function triggerStoreAddToCart(): { success: boolean; message: string } {
-  // 1. Check for standard e-commerce and brand-specific Add to Cart selectors
+  // 1. Try to auto-select size first if buttons exist and none is active
+  const sizeOptions = Array.from(
+    document.querySelectorAll<HTMLElement>(
+      'button[data-qa-action*="size"]:not([disabled]), .size-selector button:not([disabled]), [data-testid*="size"] button:not([disabled]), input[type="radio"][name*="size"]:not([disabled]) + label, .product-form__input--pill input:not([disabled]) + label, ul.sizes button:not([disabled]), .swatches--size button:not([disabled]), [class*="size-picker" i] button:not([disabled]), [data-attr="size"] button:not([disabled])'
+    )
+  );
+
+  const hasSelectedSize = sizeOptions.some(
+    (el) =>
+      el.classList.contains('active') ||
+      el.classList.contains('selected') ||
+      el.getAttribute('aria-checked') === 'true' ||
+      el.getAttribute('aria-selected') === 'true'
+  );
+
+  if (sizeOptions.length > 0 && !hasSelectedSize) {
+    try {
+      sizeOptions[0].click();
+    } catch {}
+  }
+
+  // 2. Check for standard e-commerce and brand-specific Add to Cart selectors
   const selectors = [
     // Zara
     'button[data-qa-action="add-to-cart"]',
@@ -161,6 +182,12 @@ function triggerStoreAddToCart(): { success: boolean; message: string } {
     // H&M
     'button[data-testid="add-to-bag-button"]',
     '.add-to-bag',
+    // Diesel & Salesforce Commerce Cloud
+    'button.add-to-cart',
+    'button[data-pid]',
+    'button[data-add-to-cart]',
+    '.add-to-cart-global button',
+    '.add-to-cart-btn',
     // Shopify & general
     'button[name="add"]',
     'form[action*="/cart/add"] button[type="submit"]',
@@ -179,15 +206,21 @@ function triggerStoreAddToCart(): { success: boolean; message: string } {
   ];
 
   let btn: HTMLElement | null = null;
+  let disabledBtn: HTMLElement | null = null;
+
   for (const sel of selectors) {
     const el = document.querySelector<HTMLElement>(sel);
-    if (el && el.offsetParent !== null && !el.hasAttribute('disabled')) {
-      btn = el;
-      break;
+    if (el && el.offsetParent !== null) {
+      if (!el.hasAttribute('disabled') && !el.classList.contains('disabled')) {
+        btn = el;
+        break;
+      } else {
+        disabledBtn = disabledBtn || el;
+      }
     }
   }
 
-  // 2. Fallback: search all buttons on page by text content
+  // 3. Fallback: search all buttons on page by text content
   if (!btn) {
     const candidates = Array.from(
       document.querySelectorAll<HTMLElement>('button, a, input[type="submit"], div[role="button"]')
@@ -202,32 +235,23 @@ function triggerStoreAddToCart(): { success: boolean; message: string } {
         (/add to (bag|cart|basket)/i.test(text) && text.length < 35)
       ) {
         if (el.offsetParent !== null) {
-          btn = el;
-          break;
+          if (!el.hasAttribute('disabled') && !el.classList.contains('disabled')) {
+            btn = el;
+            break;
+          } else {
+            disabledBtn = disabledBtn || el;
+          }
         }
       }
     }
   }
 
-  // 3. Try to auto-select size if buttons exist and none is active
-  const sizeOptions = Array.from(
-    document.querySelectorAll<HTMLElement>(
-      'button[data-qa-action*="size"]:not([disabled]), .size-selector button:not([disabled]), [data-testid*="size"] button:not([disabled]), input[type="radio"][name*="size"]:not([disabled]) + label, .product-form__input--pill input:not([disabled]) + label, ul.sizes button:not([disabled])'
-    )
-  );
-
-  const hasSelectedSize = sizeOptions.some(
-    (el) =>
-      el.classList.contains('active') ||
-      el.classList.contains('selected') ||
-      el.getAttribute('aria-checked') === 'true' ||
-      el.getAttribute('aria-selected') === 'true'
-  );
-
-  if (sizeOptions.length > 0 && !hasSelectedSize) {
-    try {
-      sizeOptions[0].click();
-    } catch {}
+  if (!btn && disabledBtn) {
+    disabledBtn.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    return {
+      success: false,
+      message: 'Please choose your size on the store page to finish adding to cart.',
+    };
   }
 
   if (!btn) {
