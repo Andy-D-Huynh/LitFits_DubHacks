@@ -1,3 +1,4 @@
+import { fitGarmentFromPage } from '@fitmirror/shared';
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import { guessCategory, retailerFromUrl } from '@/lib/garments/categorize';
@@ -151,5 +152,14 @@ export async function POST(req: Request) {
     category,
     sourceUrl: parsed.toString(),
     retailer: retailerFromUrl(parsed.toString()),
+    // Size chart via the ingest parser, shaped as the `garment` for
+    // POST /api/fit/direct. Null when the page's HTML has no parsable chart
+    // (many stores load the size guide with JavaScript after the page).
+    fitGarment: fitGarmentFromPage({
+      sourceUrl: parsed.toString(),
+      category,
+      tablesHtml: html,
+      text: `${name} ${description}`,
+    }),
   });
 }

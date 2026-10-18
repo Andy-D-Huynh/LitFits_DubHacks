@@ -1,5 +1,10 @@
-import type { Category, FitType, IngestRequest, Stretch } from '@fitmirror/shared';
-import { parseSizeChart } from '../../ingest/parse-chart';
+import {
+  classifyFit,
+  classifyStretch,
+  parseSizeChart,
+  type Category,
+  type IngestRequest,
+} from '@fitmirror/shared';
 import type { GarmentNormalizer, NormalizedGarment } from './types';
 
 // Deterministic normalizer: JSON-LD Product fields, keyword classification and
@@ -72,21 +77,6 @@ const CATEGORY_WORDS: [Category | 'unsupported', RegExp][] = [
 export function classifyCategory(text: string): Category | 'unsupported' | null {
   for (const [category, re] of CATEGORY_WORDS) if (re.test(text)) return category;
   return null;
-}
-
-export function classifyFit(text: string): FitType | null {
-  if (/\b(relaxed|oversized|loose|boxy|baggy|wide[- ]leg)\b/i.test(text)) return 'relaxed';
-  if (/\b(slim|skinny|fitted|tailored|muscle fit)\b/i.test(text)) return 'slim';
-  if (/\b(regular|classic|straight|standard) fit\b/i.test(text)) return 'regular';
-  return null;
-}
-
-// From fabric composition: ≥5% elastane/spandex is high stretch, any is low.
-export function classifyStretch(text: string): Stretch {
-  const m = /(\d{1,2})\s*%\s*(elastane|spandex|lycra)/i.exec(text);
-  if (m) return Number(m[1]) >= 5 ? 'high' : 'low';
-  if (/\b(elastane|spandex|lycra|stretch)\b/i.test(text)) return 'low';
-  return 'none';
 }
 
 export class MockNormalizer implements GarmentNormalizer {

@@ -1,16 +1,22 @@
-import {
-  RawSizeChartSchema,
-  type ChartType,
-  type Dim,
-  type DimValue,
-  type LengthUnit,
-  type MeasurementBasis,
-  type RawSizeChart,
-  type SizeRow,
-} from '@fitmirror/shared';
+import type { z } from 'zod';
+import { RawSizeChartSchema, type FitDirectRequestSchema } from './schemas';
+import type {
+  Category,
+  ChartType,
+  Dim,
+  DimValue,
+  FitType,
+  LengthUnit,
+  MeasurementBasis,
+  RawSizeChart,
+  SizeRow,
+  Stretch,
+} from './types';
 
 // Deterministic size-chart table parser for the DOM extraction path (no LLM).
 // Returns null rather than guessing when the unit or layout is unclear.
+// Plain string parsing, no DOM, so the server (ingest) and the extension's
+// content script share it.
 
 export type ParsedChart = {
   chart: RawSizeChart;
@@ -136,4 +142,62 @@ export function parseSizeChart(chartHtml: string, pageText = ''): ParsedChart | 
   const context = `${decode(chartHtml)} ${pageText}`;
   const chartType = detectChartType(context, hasRanges);
   return { chart: parsed.data, chartType, measurementBasis: detectBasis(context, chartType) };
+}
+
+// A whole page or a modal can hold several tables; the first one that parses
+// as a size chart wins. The text just before a table (usually its heading,
+// e.g. "Size guide (inches)") is tried first for the unit, then pageText.
+export function findSizeChart(html: string, pageText = ''): ParsedChart | null {
+  for (const match of html.matchAll(/<table[\s\S]*?<\/table>/gi)) {
+    const before = decode(html.slice(Math.max(0, match.index - 600), match.index)).slice(-200);
+    const parsed = parseSizeChart(match[0], before) ?? parseSizeChart(match[0], pageText);
+    if (parsed) return parsed;
+  }
+  return null;
+}
+
+export function classifyFit(text: string): FitType | null {
+  if (/\b(relaxed|oversized|loose|boxy|baggy|wide[- ]leg)\b/i.test(text)) return 'relaxed';
+  if (/\b(slim|skinny|fitted|tailored|muscle fit)\b/i.test(text)) return 'slim';
+  if (/\b(regular|classic|straight|standard) fit\b/i.test(text)) return 'regular';
+  return null;
+}
+
+// From fabric composition: ≥5% elastane/spandex is high stretch, any is low.
+export function classifyStretch(text: string): Stretch {
+  const m = /(\d{1,2})\s*%\s*(elastane|spandex|lycra)/i.exec(text);
+  if (m) return Number(m[1]) >= 5 ? 'high' : 'low';
+  if (/\b(elastane|spandex|lycra|stretch)\b/i.test(text)) return 'low';
+  return 'none';
+}
+
+export type FitDirectGarment = z.output<typeof FitDirectRequestSchema>['garment'];
+
+const FIT_CATEGORIES: readonly string[] = ['top', 'bottom', 'outerwear', 'dress'];
+
+/**
+ * The `garment` part of a POST /api/fit/direct body, built from a product page:
+ * its tables' HTML plus descriptive text (name, description, size-guide
+ * headings; used for fit type, stretch and the chart's unit). Null when no
+ * table parses as a size chart or the category has no fit rules.
+ */
+export function fitGarmentFromPage(page: {
+  sourceUrl?: string;
+  category: string;
+  tablesHtml: string;
+  text: string;
+}): FitDirectGarment | null {
+  if (!FIT_CATEGORIES.includes(page.category)) return null;
+  const parsed = findSizeChart(page.tablesHtml, page.text);
+  if (!parsed) return null;
+  return {
+    ...(page.sourceUrl ? { sourceUrl: page.sourceUrl } : {}),
+    category: page.category as Category,
+    fitType: classifyFit(page.text),
+    stretch: classifyStretch(page.text),
+    chartType: parsed.chartType,
+    measurementBasis: parsed.measurementBasis,
+    sizeChart: parsed.chart,
+    extractionMethod: 'dom',
+  };
 }

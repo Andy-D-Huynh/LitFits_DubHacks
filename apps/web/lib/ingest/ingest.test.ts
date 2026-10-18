@@ -1,16 +1,16 @@
-import { GarmentSchema, IngestRequestSchema } from '@fitmirror/shared';
-import { describe, expect, it } from 'vitest';
-import { llmToNormalized, LlmGarmentSchema } from '../providers/llm/anthropic';
 import {
-  classifyCategory,
   classifyFit,
   classifyStretch,
-  findProduct,
-  MockNormalizer,
-} from '../providers/llm/mock';
+  GarmentSchema,
+  IngestRequestSchema,
+  parseSizeChart,
+  parseValue,
+} from '@fitmirror/shared';
+import { describe, expect, it } from 'vitest';
+import { llmToNormalized, LlmGarmentSchema } from '../providers/llm/anthropic';
+import { classifyCategory, findProduct, MockNormalizer } from '../providers/llm/mock';
 import { createRateLimiter } from '../rate-limit';
 import { demoGarmentId, normalizedToGarment } from './build';
-import { parseSizeChart, parseValue } from './parse-chart';
 import { canonicalProductUrl } from './url';
 
 describe('canonicalProductUrl', () => {

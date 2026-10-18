@@ -238,6 +238,29 @@ export const ProfileInputSchema = z.object({
     .strict(),
 });
 
+// ---- Direct fit (POST /api/fit/direct) ----
+
+// Session-less fit for the extension: the body measurements and the garment's
+// chart travel in the request, nothing is stored. Measurements use the same
+// cm ranges as PUT /api/profile; the chart may be in cm or inches and is
+// converted in code.
+export const FitDirectRequestSchema = z.object({
+  measurements: ProfileInputSchema.shape.measurements,
+  fitPreference: FitPreferenceSchema.default('regular'),
+  measurementSource: z.partialRecord(MeasurementKeySchema, MeasurementSourceSchema).optional(),
+  garment: z.object({
+    // Only used to derive a stable garmentId for the result.
+    sourceUrl: z.url().optional(),
+    category: CategorySchema,
+    fitType: FitTypeSchema.nullable().default(null),
+    stretch: StretchSchema.default('none'),
+    chartType: ChartTypeSchema.nullable().default(null),
+    measurementBasis: MeasurementBasisSchema.nullable().default(null),
+    sizeChart: RawSizeChartSchema.extend({ rows: z.array(SizeRowSchema).min(1).max(40) }),
+    extractionMethod: z.enum(['dom', 'llm_html', 'manual']).default('dom'),
+  }),
+});
+
 // ---- Outfits API ----
 
 export const OutfitWithItemsSchema = OutfitSchema.extend({ items: z.array(OutfitItemSchema) });

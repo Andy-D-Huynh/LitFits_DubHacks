@@ -1,3 +1,4 @@
+import { fitGarmentFromPage, type FitDirectGarment } from '@fitmirror/shared';
 import { guessCategory, retailerFromUrl } from './categorize';
 import type { GarmentCategory, ProductPrice } from './types';
 
@@ -21,6 +22,10 @@ export type PageSnapshot = {
   jsonLdTexts: string[];
   metas: PageMeta[];
   images: PageImage[];
+  /** Tables on the page (size guides included), stripped of style/class/script. */
+  tablesHtml?: string;
+  /** Text around those tables, e.g. "Measurements in inches"; helps read the unit. */
+  tablesText?: string;
 };
 
 export type PageProduct = {
@@ -32,6 +37,8 @@ export type PageProduct = {
   retailer: string | null;
   price: ProductPrice | null;
   color: string | null;
+  /** Ready-to-send `garment` for POST /api/fit/direct; null without a parsable size chart. */
+  fitGarment: FitDirectGarment | null;
 };
 
 const SKIP_IMAGE = /(sprite|icon|logo|pixel|avatar|badge|placeholder)/i;
@@ -162,5 +169,11 @@ export function parsePageProduct(snapshot: PageSnapshot): PageProduct {
     retailer: retailerFromUrl(snapshot.url),
     price: product ? readPrice(product.offers) : null,
     color: color?.slice(0, 40) ?? null,
+    fitGarment: fitGarmentFromPage({
+      sourceUrl: snapshot.url,
+      category: guessCategory(`${name} ${description}`),
+      tablesHtml: snapshot.tablesHtml ?? '',
+      text: `${name} ${description} ${snapshot.tablesText ?? ''}`,
+    }),
   };
 }

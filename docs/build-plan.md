@@ -131,3 +131,10 @@ Running list of defaults taken under the Working mode in CLAUDE.md. Each one is 
 - Fixed one lint error in `lib/opencv/extract-silhouette.ts` (an unused initial value). The prototype's files are not Prettier-formatted; left as is to avoid conflicts with the partner's in-flight work.
 - Open, needs the partner: the extension has no Supabase session and captures no size chart, so it can't use `/api/fit` yet; the prototype adds `footwear`/`accessory`, which the shared schema doesn't have; `DesignDoc.md` duplicates `docs/`.
 
+### Direct fit for the extension (2026-10-17)
+- `POST /api/fit/direct` runs the fit engine on a request-supplied body and chart, so the session-less extension can show a size before the Supabase session work. No auth, nothing stored or logged; per-IP limit 60/min (in memory). Measurements are validated against the same ranges as `PUT /api/profile`.
+- `garmentId` in the result is stable per product page (same derivation as demo-mode ingest, from the canonical URL), or per chart when no URL is given.
+- The size-chart parser moved from `apps/web/lib/ingest/parse-chart.ts` to `packages/shared/src/size-chart.ts`, with `classifyFit`/`classifyStretch`, so the extension's content script uses the same parser as ingest. New: `findSizeChart` (first table on a page that parses; tries the heading text just before each table for the unit) and `fitGarmentFromPage` (builds the `/api/fit/direct` garment; null for footwear/accessory or without a chart).
+- The extension's page snapshot now includes the page's tables (style/class/script removed, 20,000 chars) and the text around them; `PageProduct.fitGarment` carries the result. No UI change. `/api/products/extract` returns the same `fitGarment` from the fetched HTML.
+- Limit: size guides that load only after a click (fetched by JavaScript) aren't in the DOM or the fetched HTML, so `fitGarment` is null there; the extension can re-extract after the guide opens.
+

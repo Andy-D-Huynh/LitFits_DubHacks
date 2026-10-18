@@ -162,13 +162,14 @@ type FitResult = {
 - `POST /api/garments/ingest` takes `source` (extension | url | screenshot), `url`, `title`, `jsonld`, `imageUrls`, `chartHtml` (max 20,000 chars, style/class/script stripped by the extension), `pageText` (max 8000 chars), optional screenshot path. Returns `Garment`. Idempotent on `source_url`.
 - `GET /api/garments/:id`.
 - `POST /api/fit` takes `garmentId`, `profileId` → `FitResult`. Pure computation, no LLM.
+- `POST /api/fit/direct` takes `measurements` (cm, same ranges as the profile), optional `fitPreference`, and a `garment` with its size chart (cm or in) → `FitResult`. No auth, nothing stored, 60/min per IP, CORS for the extension. `garment` is what `fitGarmentFromPage` (shared) returns.
 - `GET /api/alternatives?garmentId=&profileId=` returns ingested garments of the same category ranked by fit score for this user.
 
 **Try-on**
 - `POST /api/tryon` takes `garmentIds`, `profileId` → `{ renderId, status }`. Cache hit returns `done` immediately.
 - `GET /api/tryon/:id` → status and signed image URL.
 - `POST /api/tryon/direct`: the extension prototype's session-less try-on; see `docs/tryon.md`. Off in production unless `TRYON_DIRECT_ENABLED=true`.
-- `POST /api/products/extract` (extension prototype): fetches a product URL server-side and returns name, brand, image and a guessed category. No size chart; to be folded into ingest.
+- `POST /api/products/extract` (extension prototype): fetches a product URL server-side and returns name, brand, image, a guessed category and `fitGarment` (the size chart via the shared parser, ready for `/api/fit/direct`; null when the HTML has no parsable chart). To be folded into ingest.
 - `GET /api/cart`: liked product links (local dev file).
 
 **Outfits**

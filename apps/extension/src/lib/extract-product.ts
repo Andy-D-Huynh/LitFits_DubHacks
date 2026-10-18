@@ -37,7 +37,29 @@ function snapshotFromDocument(): PageSnapshot {
     jsonLdTexts,
     metas,
     images,
+    ...tablesFromDocument(),
   };
+}
+
+// Same limits as the ingest API's chartHtml: style/class/script removed, 20,000 chars.
+const MAX_TABLES_HTML = 20_000;
+
+function tablesFromDocument(): { tablesHtml: string; tablesText: string } {
+  let tablesHtml = '';
+  const context: string[] = [];
+  for (const table of document.querySelectorAll('table')) {
+    const copy = table.cloneNode(true) as HTMLTableElement;
+    copy.querySelectorAll('script, style').forEach((el) => el.remove());
+    for (const el of [copy, ...copy.querySelectorAll('*')]) {
+      el.removeAttribute('style');
+      el.removeAttribute('class');
+    }
+    if (tablesHtml.length + copy.outerHTML.length > MAX_TABLES_HTML) break;
+    tablesHtml += copy.outerHTML;
+    const around = table.parentElement?.parentElement?.textContent ?? '';
+    context.push(around.replace(/\s+/g, ' ').slice(0, 500));
+  }
+  return { tablesHtml, tablesText: context.join(' ') };
 }
 
 /** Read the product on the retail page the user is actually viewing. */

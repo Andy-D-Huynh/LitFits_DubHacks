@@ -40,6 +40,7 @@ export type IngestSource = z.infer<typeof S.IngestSourceSchema>;
 export type IngestRequest = z.infer<typeof S.IngestRequestSchema>;
 export type FitRequest = z.infer<typeof S.FitRequestSchema>;
 export type ProfileInput = z.infer<typeof S.ProfileInputSchema>;
+export type FitDirectRequest = z.input<typeof S.FitDirectRequestSchema>;
 export type OutfitWithItems = z.infer<typeof S.OutfitWithItemsSchema>;
 export type CreateOutfit = z.infer<typeof S.CreateOutfitSchema>;
 export type OutfitItemInput = z.infer<typeof S.OutfitItemInputSchema>;
