@@ -53,6 +53,7 @@ Layout and data model: `docs/architecture.md`.
 - Env: copy `apps/web/.env.example` to `apps/web/.env.local`
 - DB: apply `supabase/migrations/*.sql` in order, then `pnpm --filter @fitmirror/web seed` loads `fixtures/garments/` (needs the service role key)
 - Live API smoke test: with the dev server running, `pnpm --filter @fitmirror/web smoke` (creates and deletes throwaway users; needs the service role key)
+- Real try-on check (one fal call, needs FAL_KEY): `pnpm --filter @fitmirror/web tryon:smoke -- --photo <path> --garment-image <path|url>` (`--dry-run` to skip the call)
 - Demo mode: `DEMO_MODE=true` env, or `?demo=1` in the URL
 
 ## Owners

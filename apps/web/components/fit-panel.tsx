@@ -35,10 +35,12 @@ export function FitPanel({
   garments,
   body,
   editHref,
+  onGarmentChange,
 }: {
   garments: Garment[];
   body: FitBody;
   editHref: string;
+  onGarmentChange?: (garmentId: string) => void;
 }) {
   const { measurements, measurementSource } = body;
   const [garmentId, setGarmentId] = useState(garments[0]?.id ?? '');
@@ -63,7 +65,10 @@ export function FitPanel({
           <select
             className="rounded-md border bg-background px-2 py-1.5"
             value={garmentId}
-            onChange={(e) => setGarmentId(e.target.value)}
+            onChange={(e) => {
+              setGarmentId(e.target.value);
+              onGarmentChange?.(e.target.value);
+            }}
           >
             {CategorySchema.options.map((category) => (
               <optgroup key={category} label={category}>

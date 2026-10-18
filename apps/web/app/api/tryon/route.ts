@@ -6,18 +6,16 @@ import { env } from '@/lib/env';
 import { jsonError, parseBody } from '@/lib/http';
 import { getTryOnProvider } from '@/lib/providers/tryon';
 import { createSupabaseAdminClient } from '@/lib/supabase/server';
+import { signedPhotoUrl, tryOnPhotoPath } from '@/lib/photos/storage';
 import {
+  checkRenderBudget,
   garmentImageUrl,
   planRender,
   processRender,
   requestRender,
   type PipelineDeps,
 } from '@/lib/tryon/pipeline';
-import {
-  signedModelPhotoUrl,
-  supabaseImageStore,
-  supabaseRenderStore,
-} from '@/lib/tryon/supabase-store';
+import { supabaseImageStore, supabaseRenderStore } from '@/lib/tryon/supabase-store';
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 180; // a real provider takes 10–40 s per layer
@@ -49,7 +47,11 @@ export async function POST(req: NextRequest) {
   }
 
   const provider = getTryOnProvider(ctx.demo);
-  const personKey = profile.modelPhotoPath ?? `profile:${profile.id}`;
+  // Faceless photo unless the user opted in; its path seeds the cache-key chain.
+  const personPath = profile.modelPhotoPath
+    ? tryOnPhotoPath({ modelPhotoPath: profile.modelPhotoPath, faceOptIn: profile.faceOptIn })
+    : null;
+  const personKey = personPath ?? `profile:${profile.id}`;
 
   if (ctx.demo) {
     // No network or DB: render the outfit with the mock and return it directly.
@@ -71,11 +73,12 @@ export async function POST(req: NextRequest) {
 
   let personImageUrl = MOCK_PERSON_URL;
   if (provider.name !== 'mock') {
-    if (!profile.modelPhotoPath) return jsonError(409, 'No model photo yet; capture one first');
+    if (!personPath) return jsonError(409, 'Upload a full-body photo on /onboarding first');
     if (garments.some((g) => !garmentImageUrl(g))) {
       return jsonError(422, 'Every garment needs a product image for try-on');
     }
-    personImageUrl = await signedModelPhotoUrl(admin, profile.modelPhotoPath);
+    // Short-lived signed URL: the provider can fetch it for 10 minutes only.
+    personImageUrl = await signedPhotoUrl(admin, personPath);
   }
 
   const deps: PipelineDeps = {
@@ -84,6 +87,14 @@ export async function POST(req: NextRequest) {
     provider,
   };
   const plan = planRender(profile.id, personKey, personImageUrl, garments, provider.name);
+  const budget = await checkRenderBudget(deps, plan, env().TRYON_DAILY_LIMIT);
+  if (!budget.ok) {
+    return jsonError(
+      429,
+      `Try-on limit reached: ${budget.used} of ${budget.limit} renders used in the last 24 hours`,
+      budget,
+    );
+  }
   const { row, needsProcessing } = await requestRender(deps, plan);
   if (needsProcessing) after(() => processRender(deps, plan, row.id));
 

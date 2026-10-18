@@ -110,3 +110,24 @@ Running list of defaults taken under the Working mode in CLAUDE.md. Each one is 
 - URL canonicalization keeps variant query params (e.g. `color`) and drops tracking params, so different colorways stay separate garments.
 - Screenshot ingest returns 501; the vision fallback is not built.
 - Ingest needs `SUPABASE_SERVICE_ROLE_KEY` on Vercel (planned for M2, per the earlier decision to hold it).
+
+### fal try-on and model photo (2026-10-17)
+- Head location runs in the browser (MediaPipe Pose, already in the stack for M4) and only the box is sent; the server does the blur, so the faceless copy exists before any provider call. No pose → top 22% of the photo is blurred, and the UI says so.
+- Two stored objects per photo (`original.jpg`, `faceless.jpg`); the owner sees the original, providers get the faceless copy. Replacing or deleting a photo removes both.
+- `TRYON_PROVIDER=fal` without `FAL_KEY` falls back to the mock with a warning instead of failing; Replicate now behaves the same way.
+- Render limit is per profile per rolling 24 h, counting real-provider layer renders (default 20, `TRYON_DAILY_LIMIT`).
+- Photo upload, try-on and ingest all need `SUPABASE_SERVICE_ROLE_KEY` on the server.
+- `/studio` gained a try-on panel beside the fit panel (partner's area; kept minimal per the explicit request): model photo, render of the selected garment, skeleton while running, and a "the render shows the look, not the size" note.
+- Placeholder fixtures have no product images, so the smoke test takes `--garment-image`.
+- Not built yet: the "Delete my data" button (privacy doc) should also remove model photos and renders from storage.
+
+### Merging the extension try-on prototype (2026-10-17)
+- `Try-on-with-api-works` (extension photo, live fal try-on, outline figure, studio redesign, `/shop`) is merged on top of `fal-tryon` as `integrate-tryon`.
+- `/studio` takes the prototype's page (studio UI is the partner's area). `StudioView`, `TryOnView` and `FitPanel` stay in `components/` for the partner to place.
+- Both branches had created `/api/tryon`. The spec'd route (session, outfit, render cache, budget) keeps the path; the prototype's route moved to `/api/tryon/direct`, and the extension's background script now calls that path (a one-line change in the extension).
+- One fal code path: the prototype's `lib/tryon/fashn.ts` was replaced by `FalTryOn.renderImages`, which takes over its tested request settings (`moderation_level: permissive`, `segmentation_free: true`, PNG output).
+- The direct route is off in production unless `TRYON_DIRECT_ENABLED=true`; see `docs/tryon.md`.
+- Removed the accidental `LitFits_DubHacks` gitlink (a nested-repo pointer with no `.gitmodules`).
+- Fixed one lint error in `lib/opencv/extract-silhouette.ts` (an unused initial value). The prototype's files are not Prettier-formatted; left as is to avoid conflicts with the partner's in-flight work.
+- Open, needs the partner: the extension has no Supabase session and captures no size chart, so it can't use `/api/fit` yet; the prototype adds `footwear`/`accessory`, which the shared schema doesn't have; `DesignDoc.md` duplicates `docs/`.
+

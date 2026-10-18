@@ -3,6 +3,8 @@ import { describe, expect, it } from 'vitest';
 import type { TryOnInput, TryOnProvider } from '../providers/tryon/types';
 import {
   chainKeys,
+  checkRenderBudget,
+  RENDER_LIMIT_WINDOW_MS,
   planRender,
   processRender,
   requestRender,
@@ -62,6 +64,11 @@ class MemoryStore implements RenderStore {
   async update(id: string, patch: Partial<RenderRow>) {
     const row = this.rows.find((r) => r.id === id);
     if (row) Object.assign(row, patch);
+  }
+  async countSince(profileId: string, provider: string, sinceIso: string) {
+    return this.rows.filter(
+      (r) => r.profileId === profileId && r.provider === provider && r.createdAt >= sinceIso,
+    ).length;
   }
 }
 
@@ -188,5 +195,52 @@ describe('render queue', () => {
     expect(stale.needsProcessing).toBe(true);
     expect(store.rows).toHaveLength(1);
     expect(stale.row.id).toBe(first.row.id);
+  });
+});
+
+describe('render budget', () => {
+  it('blocks a request that would exceed the per-profile limit', async () => {
+    const { deps, run, provider } = setup();
+    await run([tee, chino]); // 2 provider renders recorded for the profile
+    const plan = planRender(
+      PROFILE,
+      `profile:${PROFILE}`,
+      'https://person.test/me.jpg',
+      [tee, jogger, jacket],
+      provider.name,
+    );
+    // tee is cached; jogger and jacket need renders: 2 used + 2 needed.
+    expect(await checkRenderBudget(deps, plan, 4)).toEqual({ ok: true });
+    expect(await checkRenderBudget(deps, plan, 3)).toEqual({
+      ok: false,
+      used: 2,
+      needed: 2,
+      limit: 3,
+    });
+  });
+
+  it('never limits a fully cached outfit or the mock', async () => {
+    const { deps, run, provider } = setup();
+    await run([tee, chino]);
+    const cached = planRender(
+      PROFILE,
+      `profile:${PROFILE}`,
+      'https://person.test/me.jpg',
+      [tee, chino],
+      provider.name,
+    );
+    expect(await checkRenderBudget(deps, cached, 0)).toEqual({ ok: true });
+    const mockDeps = { ...deps, provider: { name: 'mock', render: provider.render } };
+    const fresh = planRender(PROFILE, 'other', 'u', [jacket], 'mock');
+    expect(await checkRenderBudget(mockDeps, fresh, 0)).toEqual({ ok: true });
+  });
+
+  it('only counts renders inside the 24 h window', async () => {
+    const { deps, run, store, provider } = setup();
+    await run([tee, chino]);
+    for (const r of store.rows)
+      r.createdAt = new Date(Date.now() - RENDER_LIMIT_WINDOW_MS - 1000).toISOString();
+    const plan = planRender(PROFILE, 'p2', 'u', [jacket], provider.name);
+    expect(await checkRenderBudget(deps, plan, 1)).toEqual({ ok: true });
   });
 });

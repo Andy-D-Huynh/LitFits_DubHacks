@@ -95,3 +95,14 @@ export const MEASUREMENT_RANGES_CM: Record<
   inseam: [50, 110],
   arm_length: [40, 90],
 };
+
+// Head box for the faceless try-on photo (docs/tryon.md), in units of the
+// head scale s = the wider of ear-to-ear span and half the shoulder span.
+export const HEAD_BOX = {
+  widthScale: 2.4, // box width = widthScale × s, centred on the nose
+  aboveFaceScale: 1.6, // top of head: this far above the highest face landmark
+  belowMouthScale: 1.0, // chin and neck: this far below the mouth
+  minVisibility: 0.5,
+} as const;
+// Used when no pose is found: blur this top fraction of the photo instead.
+export const FALLBACK_HEAD_BAND = 0.22;
