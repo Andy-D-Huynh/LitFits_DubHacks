@@ -1,3 +1,4 @@
+import { NormBoxSchema } from '@fitmirror/shared';
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import { rememberLikedLink, readLikedLinks } from '@/lib/cart/liked-garments';
@@ -12,7 +13,8 @@ import {
   falSubscribeWithKey,
 } from '@/lib/providers/tryon/fal';
 import { clientIp, createRateLimiter } from '@/lib/rate-limit';
-import { createResultCache, directCacheKey } from '@/lib/tryon/direct';
+import { PhotoError } from '@/lib/photos/process';
+import { createResultCache, directCacheKey, facelessDataUrl } from '@/lib/tryon/direct';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -23,6 +25,11 @@ export const maxDuration = 120;
 // profile, so it gets an in-memory cache and a per-IP limit instead of the
 // render cache and per-profile budget, and it is off in production unless
 // TRYON_DIRECT_ENABLED=true. See docs/tryon.md.
+//
+// blurHead: the extension sends its original photo (a data URL) with the head
+// box MediaPipe found, and the head is blurred here, with the same code as an
+// /onboarding upload, before fal sees it. Chained renders (http URLs) derive
+// from an already-blurred photo and are sent as they are.
 
 const BodySchema = z.object({
   modelImage: z.string().min(1),
@@ -31,6 +38,8 @@ const BodySchema = z.object({
   name: z.string().min(1).max(200),
   retailer: z.string().max(80).nullable().optional(),
   category: z.string().max(40).optional(),
+  blurHead: z.boolean().default(false),
+  headBox: NormBoxSchema.nullable().optional(),
 });
 
 const cache = createResultCache();
@@ -59,7 +68,10 @@ export async function POST(req: Request) {
     imageUrl = TRYON_PLACEHOLDER_URL;
   } else {
     if (!config.FAL_KEY) return jsonError(503, 'FAL_KEY is not set on the server');
-    const key = directCacheKey(body.modelImage, body.garmentImage, category);
+    const person = body.blurHead
+      ? `${body.modelImage}|blur:${JSON.stringify(body.headBox ?? null)}`
+      : body.modelImage;
+    const key = directCacheKey(person, body.garmentImage, category);
     const hit = cache.get(key);
     if (hit) {
       imageUrl = hit;
@@ -71,13 +83,22 @@ export async function POST(req: Request) {
           { error: 'Try-on limit reached; try again later' },
           { status: 429, headers: { 'Retry-After': String(allowed.retryAfterS) } },
         );
+      let modelImage = body.modelImage;
+      if (body.blurHead) {
+        try {
+          modelImage = await facelessDataUrl(body.modelImage, body.headBox ?? null);
+        } catch (error) {
+          if (error instanceof PhotoError) return jsonError(422, error.message);
+          return jsonError(422, 'Could not read that photo');
+        }
+      }
       try {
         const provider = new FalTryOn(
           falSubscribeWithKey(config.FAL_KEY),
           config.TRYON_MODEL ?? DEFAULT_FAL_TRYON_MODEL,
         );
         ({ imageUrl } = await provider.renderImages({
-          modelImage: body.modelImage,
+          modelImage,
           garmentImage: body.garmentImage,
           category,
         }));

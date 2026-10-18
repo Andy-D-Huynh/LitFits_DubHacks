@@ -37,6 +37,7 @@ async function tryOnThisPage(category?: GarmentCategory): Promise<{ ok: boolean;
     name: product.name,
     retailer: product.retailer,
     category: category ?? product.category,
+    fitGarment: product.fitGarment,
   })) as { ok?: boolean; error?: string } | undefined;
   if (!response?.ok) return { ok: false, error: response?.error || 'Try-on failed' };
   return { ok: true };

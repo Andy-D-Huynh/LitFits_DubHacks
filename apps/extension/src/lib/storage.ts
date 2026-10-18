@@ -1,4 +1,7 @@
 import { trackForCategory } from './categorize';
+import { detectHeadBox } from './head-box';
+import { photoFingerprint } from './tryon-flow';
+import { updateTryOnState } from './tryon-state';
 import type {
   FigurePersist,
   GarmentCategory,
@@ -220,6 +223,13 @@ export async function setModelPhoto(
     silhouette: silhouette ?? current.silhouette,
   };
   await saveFigure(next);
+  // Locate the head now so try-on can blur it; a new photo starts a new look.
+  const headBox = await detectHeadBox(modelImage);
+  await updateTryOnState({
+    photo: { fingerprint: photoFingerprint(modelImage), headBox },
+    lastGoodRender: null,
+    lastError: null,
+  });
   return next;
 }
 

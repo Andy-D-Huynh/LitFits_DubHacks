@@ -21,3 +21,6 @@ Thumbs.db
 
 # try-on smoke test output (your photos)
 apps/web/.smoke/
+
+# MediaPipe wasm copied at build time (vite.config.ts)
+apps/extension/public/mediapipe/
