@@ -17,6 +17,7 @@ if (!url || !anonKey || !serviceKey) {
 }
 
 const admin = createClient(url, serviceKey, { auth: { persistSession: false } });
+const DEMO_PROFILE = '00000000-0000-4000-8000-0000000000d1';
 const TEE = '00000000-0000-4000-8000-000000000001';
 let failures = 0;
 const cleanupUserIds: string[] = [];
@@ -127,7 +128,40 @@ async function profileChecks(token: string, otherToken: string) {
   return created.json.id as string;
 }
 
-const steps = (process.argv[3] ?? 'profile').split(',');
+async function fitChecks(token: string, otherToken: string, profileId: string) {
+  const g = await call(null, 'GET', `/api/garments/${TEE}`);
+  check(
+    'GET /api/garments/:id → seeded placeholder',
+    g.status === 200 && g.json.isPlaceholder === true,
+    g,
+  );
+  const bad = await call(null, 'GET', '/api/garments/not-a-uuid');
+  check('GET /api/garments/:id rejects a bad id → 400', bad.status === 400, bad.status);
+  const missing = await call(null, 'GET', '/api/garments/00000000-0000-4000-8000-00000000ffff');
+  check('GET /api/garments/:id unknown → 404', missing.status === 404, missing.status);
+
+  const fit = await call(token, 'POST', '/api/fit', { garmentId: TEE, profileId });
+  check(
+    'POST /api/fit → per-size verdicts for own profile',
+    fit.status === 200 && Array.isArray(fit.json.perSize) && fit.json.perSize.length === 4,
+    fit,
+  );
+  const other = await call(otherToken, 'POST', '/api/fit', { garmentId: TEE, profileId });
+  check("POST /api/fit with another user's profile → 404", other.status === 404, other.status);
+  const noAuth = await call(null, 'POST', '/api/fit', { garmentId: TEE, profileId });
+  check('POST /api/fit without auth → 401', noAuth.status === 401, noAuth.status);
+  const demo = await call(null, 'POST', '/api/fit?demo=1', {
+    garmentId: TEE,
+    profileId: DEMO_PROFILE,
+  });
+  check(
+    'POST /api/fit in demo mode → L',
+    demo.status === 200 && demo.json.recommendedSize === 'L',
+    demo.json,
+  );
+}
+
+const steps = (process.argv[3] ?? 'all').split(',');
 const users = [await newUser(), await newUser()];
 try {
   const [a, b] = users as [
@@ -135,9 +169,7 @@ try {
     Awaited<ReturnType<typeof newUser>>,
   ];
   const profileId = await profileChecks(a.token, b.token);
-  void steps;
-  void profileId;
-  void TEE;
+  if (steps.includes('all') || steps.includes('fit')) await fitChecks(a.token, b.token, profileId);
 } finally {
   const ids = [...users.map((u) => u.id), ...cleanupUserIds];
   for (const id of ids) await admin.auth.admin.deleteUser(id);

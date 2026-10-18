@@ -31,3 +31,17 @@ export async function saveOwnProfile(
   if (error) throw new Error(`Saving profile failed: ${error.message}`);
   return { profile: rowToProfile(data), created: !existing };
 }
+
+// RLS returns null for another user's profile, so callers can treat it as not found.
+export async function getProfileById(
+  supabase: SupabaseClient,
+  id: string,
+): Promise<Profile | null> {
+  const { data, error } = await supabase
+    .from('profiles')
+    .select('*')
+    .eq('id', id)
+    .maybeSingle<ProfileRow>();
+  if (error) throw new Error(`Loading profile failed: ${error.message}`);
+  return data ? rowToProfile(data) : null;
+}

@@ -78,3 +78,8 @@ Running list of defaults taken under the Working mode in CLAUDE.md. Each one is 
 - Demo mode: `GET` serves `fixtures/profiles/demo.json`; `PUT` echoes the edits without saving.
 - Middleware only refreshes the session when an `sb-` cookie exists and demo mode is off, so first visits and demos never wait on Supabase.
 - `/studio` reads the profile (or the demo profile) and lists garments from the DB (fixtures in demo); `hardcoded-body.ts` is gone. `fixtures/` is traced into the server bundle for runtime reads on Vercel.
+
+### Step 3: Fit API (2026-10-17)
+- `POST /api/fit` needs a signed-in caller; another user's profile id returns 404 (RLS hides it), not 403, so ids don't leak.
+- `GET /api/garments/:id` is public (shared catalog). Bad ids → 400, unknown → 404.
+- Demo mode: `POST /api/fit?demo=1` only accepts the demo profile id and fixture garments.
