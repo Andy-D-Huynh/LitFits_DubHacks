@@ -138,3 +138,12 @@ Running list of defaults taken under the Working mode in CLAUDE.md. Each one is 
 - The extension's page snapshot now includes the page's tables (style/class/script removed, 20,000 chars) and the text around them; `PageProduct.fitGarment` carries the result. No UI change. `/api/products/extract` returns the same `fitGarment` from the fetched HTML.
 - Limit: size guides that load only after a click (fetched by JavaScript) aren't in the DOM or the fetched HTML, so `fitGarment` is null there; the extension can re-extract after the guide opens.
 
+### Extension-only flow (2026-10-17)
+- The team is going extension-only for the demo. The background script runs `/api/fit/direct` alongside every try-on and writes results to `chrome.storage` key `fitmirror-tryon` (`lastFit`, `fits` by product URL, `pending`, `lastError`, `lastGoodRender`). Each fit entry carries a ready `label` ("Your size: M", "Your size: probably M" on low confidence, the first warning when no size fits, or why it was skipped).
+- Settings live in `fitmirror-settings` (`apiBase`, `faceOptIn` default false, `measurements` in cm, `fitPreference`), separate from the figure, which is mirrored into the studio's localStorage.
+- MediaPipe runs in the side panel when a photo is saved (from `storage.setModelPhoto`); MV3 forbids CDN scripts, so the SIMD wasm (~14 MB) is copied into the extension at build time and the manifest allows `wasm-unsafe-eval`. The pose model is fetched from Google at runtime. No pose or a 15 s timeout → the server blurs the top band.
+- API base: `fitmirror-settings.apiBase`, else build-time `VITE_API_BASE`, else `http://localhost:3000`. The production URL is `https://fitmirror-three.vercel.app` (needs `TRYON_DIRECT_ENABLED=true` and `FAL_KEY`).
+- Failure safety: a failed or unloadable render leaves the previous look in place, records `lastError`, and shows a toast on the page via `chrome.scripting.executeScript`; no UI component changed.
+- UI still needed (partner): size label next to the try-on, a measurements form (`setMeasurements`), a face opt-in toggle (`setFaceOptIn`), optional pending/error display and an API base switch.
+- Not yet verified in Chrome: MediaPipe inside the extension and the toast.
+

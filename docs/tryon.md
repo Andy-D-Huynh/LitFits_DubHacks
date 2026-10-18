@@ -69,6 +69,6 @@ The render does not reflect size. Always place it next to the fit panel, never a
 - It uses the same `FalTryOn` as the pipeline (`renderImages`); free-text categories map through `falCategoryFromText` (`footwear`, `accessory` → `auto`).
 - Guards, since there is no profile: an in-memory result cache keyed on both images and the category, and a per-IP limit of `TRYON_DAILY_LIMIT` per 24 h (per server instance). Demo mode returns the mock placeholder; no `FAL_KEY` → 503.
 - Off in production (404) unless `TRYON_DIRECT_ENABLED=true`, because the guards are best effort and the route can spend fal credit for anyone who can reach it.
-- **Open (privacy):** this route sends the user's unblurred photo, as the extension stores it. Until the extension moves to the profile photo (faceless copy) and `POST /api/tryon`, treat it as face opt-in and keep it to local dev.
+- **Head blur:** the extension sends its original photo with `blurHead: true` and the head box MediaPipe found when the photo was saved (`headBox`, or null → top band). The route blurs it with `facelessDataUrl` (the same `processModelPhoto` + `blurRegion` as `/onboarding`) before fal. Chained renders (http URLs) come from a blurred photo and are sent as they are. The extension skips the blur only when `faceOptIn` is set in `chrome.storage` (`fitmirror-settings`); changing it restarts the look from the original photo.
 - The liked-links file (`apps/web/.data/`) is a local-dev convenience; a write failure (read-only filesystem on Vercel) no longer fails a render.
 
