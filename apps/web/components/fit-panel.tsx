@@ -4,11 +4,13 @@ import {
   CategorySchema,
   FitPreferenceSchema,
   computeFit,
+  type FitBody,
   type FitPreference,
   type FitVerdict,
-  type GarmentFixture,
+  type Garment,
   type Measurements,
 } from '@fitmirror/shared';
+import Link from 'next/link';
 import { useMemo, useState } from 'react';
 import { cn } from '@/lib/utils';
 
@@ -31,21 +33,22 @@ const MEASUREMENT_LABELS: Record<keyof Measurements, string> = {
 
 export function FitPanel({
   garments,
-  measurements,
+  body,
+  editHref,
 }: {
-  garments: GarmentFixture[];
-  measurements: Measurements;
+  garments: Garment[];
+  body: FitBody;
+  editHref: string;
 }) {
+  const { measurements, measurementSource } = body;
   const [garmentId, setGarmentId] = useState(garments[0]?.id ?? '');
-  const [fitPreference, setFitPreference] = useState<FitPreference>('regular');
+  const [fitPreference, setFitPreference] = useState<FitPreference>(body.fitPreference);
   const garment = garments.find((g) => g.id === garmentId);
 
   const fit = useMemo(
     () =>
-      garment
-        ? computeFit(garment, { measurements, measurementSource: null, fitPreference })
-        : null,
-    [garment, measurements, fitPreference],
+      garment ? computeFit(garment, { measurements, measurementSource, fitPreference }) : null,
+    [garment, measurements, measurementSource, fitPreference],
   );
 
   return (
@@ -92,13 +95,16 @@ export function FitPanel({
       </div>
 
       <p className="text-muted-foreground text-xs">
-        Hardcoded measurements (cm):{' '}
+        Your measurements (cm):{' '}
         {Object.entries(measurements)
           .map(([k, v]) => `${MEASUREMENT_LABELS[k as keyof Measurements]} ${v}`)
-          .join(' · ')}
+          .join(' · ')}{' '}
+        <Link className="underline" href={editHref}>
+          Edit
+        </Link>
       </p>
 
-      {garment?.placeholder && (
+      {garment?.isPlaceholder && (
         <p className="rounded-md bg-amber-100 px-3 py-2 text-sm text-amber-900 dark:bg-amber-950 dark:text-amber-200">
           Placeholder size chart, not real retailer data.
         </p>

@@ -39,3 +39,4 @@ export type FitResult = z.infer<typeof S.FitResultSchema>;
 export type IngestSource = z.infer<typeof S.IngestSourceSchema>;
 export type IngestRequest = z.infer<typeof S.IngestRequestSchema>;
 export type FitRequest = z.infer<typeof S.FitRequestSchema>;
+export type ProfileInput = z.infer<typeof S.ProfileInputSchema>;

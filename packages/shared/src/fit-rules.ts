@@ -80,3 +80,18 @@ export const VERDICT_RANK: Record<'good' | 'loose' | 'tight' | 'unknown', number
   tight: 2,
   unknown: 3,
 };
+
+// Plausible adult ranges (cm) for manual entry and photo estimates (docs/measurement.md).
+// Values outside are rejected as typos rather than fitted.
+export const HEIGHT_RANGE_CM: Band = [120, 230];
+export const MEASUREMENT_RANGES_CM: Record<
+  'shoulder_width' | 'chest' | 'waist' | 'hip' | 'inseam' | 'arm_length',
+  Band
+> = {
+  shoulder_width: [30, 65],
+  chest: [60, 170],
+  waist: [45, 170],
+  hip: [60, 180],
+  inseam: [50, 110],
+  arm_length: [40, 90],
+};

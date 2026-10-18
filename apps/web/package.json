@@ -8,7 +8,8 @@
     "build": "next build",
     "start": "next start",
     "typecheck": "tsc --noEmit",
-    "seed": "tsx --env-file-if-exists=.env.local scripts/seed.ts"
+    "seed": "tsx --env-file-if-exists=.env.local scripts/seed.ts",
+    "smoke": "tsx --env-file-if-exists=.env.local scripts/smoke-api.ts"
   },
   "dependencies": {
     "@fitmirror/shared": "workspace:*",

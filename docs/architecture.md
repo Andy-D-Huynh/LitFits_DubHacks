@@ -154,6 +154,9 @@ type FitResult = {
 - `POST /api/capture-sessions` → `{ id, qrUrl }`. Phone opens `qrUrl`.
 - `POST /api/capture-sessions/:id/complete` takes height, measurements, confidence, model photo upload path. Broadcasts over Realtime so the desktop updates live.
 - `PUT /api/profile` creates or updates the profile (manual edits set source to `manual`).
+- `GET /api/profile` returns the caller's profile (404 if none yet). One profile per user: the most recent row.
+
+**Auth for all routes:** the web app's Supabase cookie session, or `Authorization: Bearer <access token>` (extension, scripts). The first `PUT /api/profile` without a session signs the visitor in anonymously. `?demo=1` or `DEMO_MODE=true` serves fixtures with no auth or network.
 
 **Garments and fit**
 - `POST /api/garments/ingest` takes `source` (extension | url | screenshot), `url`, `title`, `jsonld`, `imageUrls`, `chartHtml` (max 20,000 chars, style/class/script stripped by the extension), `pageText` (max 8000 chars), optional screenshot path. Returns `Garment`. Idempotent on `source_url`.

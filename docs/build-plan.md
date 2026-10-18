@@ -68,3 +68,13 @@ Running list of defaults taken under the Working mode in CLAUDE.md. Each one is 
 - Center-of-band tie-break uses the main dim (chest for top/outerwear/dress, waist for bottom); fit preference only breaks a remaining tie.
 - The "no size fits well" warning still returns the closest size as `recommendedSize`; it doesn't null it out.
 - Outerwear offset: chest +6, waist +6, shoulder +1 cm on garment charts only. Numbers are guesses, tunable in `fit-rules.ts`.
+
+### Step 2: Profile (2026-10-17)
+- Routes accept the cookie session or `Authorization: Bearer`. Bearer is what the extension will use after pairing, and what the live smoke test uses.
+- One profile per user, enforced in code (the most recent row wins); no unique constraint, to avoid a migration.
+- `PUT /api/profile` is the only route that signs a visitor in anonymously. It returns 503 with the reason if anonymous sign-in is disabled in Supabase Auth settings.
+- Manual entry validates against plausible adult ranges (`HEIGHT_RANGE_CM`, `MEASUREMENT_RANGES_CM` in `fit-rules.ts`); out-of-range values are rejected as typos.
+- Centimeters only in the form until question 8 is answered.
+- Demo mode: `GET` serves `fixtures/profiles/demo.json`; `PUT` echoes the edits without saving.
+- Middleware only refreshes the session when an `sb-` cookie exists and demo mode is off, so first visits and demos never wait on Supabase.
+- `/studio` reads the profile (or the demo profile) and lists garments from the DB (fixtures in demo); `hardcoded-body.ts` is gone. `fixtures/` is traced into the server bundle for runtime reads on Vercel.
