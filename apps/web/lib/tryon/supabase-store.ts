@@ -67,6 +67,16 @@ export function supabaseRenderStore(db: SupabaseClient): RenderStore {
       if (error) throw new Error(`Saving render failed: ${error.message}`);
       return fromRow(data);
     },
+    async countSince(profileId, provider, sinceIso) {
+      const { count, error } = await db
+        .from('tryon_renders')
+        .select('id', { count: 'exact', head: true })
+        .eq('profile_id', profileId)
+        .eq('provider', provider)
+        .gte('created_at', sinceIso);
+      if (error) throw new Error(`Counting renders failed: ${error.message}`);
+      return count ?? 0;
+    },
     async update(id, patch) {
       const { error } = await db.from('tryon_renders').update(toRow(patch)).eq('id', id);
       if (error) throw new Error(`Updating render failed: ${error.message}`);
@@ -107,12 +117,4 @@ export function supabaseImageStore(admin: SupabaseClient): ImageStore {
       return data.signedUrl;
     },
   };
-}
-
-export async function signedModelPhotoUrl(admin: SupabaseClient, path: string): Promise<string> {
-  const { data, error } = await admin.storage
-    .from('model-photos')
-    .createSignedUrl(path, SIGNED_URL_SECONDS);
-  if (error) throw new Error(`Signing model photo URL failed: ${error.message}`);
-  return data.signedUrl;
 }

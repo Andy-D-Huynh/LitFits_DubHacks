@@ -419,6 +419,92 @@ async function ingestChecks() {
   }
 }
 
+async function photoChecks(token: string, otherToken: string, userId: string, profileId: string) {
+  const { default: sharp } = await import('sharp');
+  const raw = Buffer.alloc(600 * 900 * 3);
+  for (let i = 0; i < raw.length; i++) raw[i] = (i * 37 + (i >> 7) * 91) % 256;
+  const jpeg = await sharp(raw, { raw: { width: 600, height: 900, channels: 3 } })
+    .jpeg()
+    .withMetadata({ exif: { IFD0: { Artist: 'smoke' } } })
+    .toBuffer();
+  const form = (file: Blob, headBox?: unknown) => {
+    const f = new FormData();
+    f.append('photo', file, 'me.jpg');
+    if (headBox) f.append('headBox', JSON.stringify(headBox));
+    return f;
+  };
+  const post = (t: string | null, body: FormData, query = '') =>
+    fetch(`${base}/api/profile/photo${query}`, {
+      method: 'POST',
+      headers: t ? { authorization: `Bearer ${t}` } : {},
+      body,
+    });
+
+  const noProfile = await post(otherToken, form(new Blob([jpeg], { type: 'image/jpeg' })));
+  check('photo upload before measurements → 409', noProfile.status === 409, noProfile.status);
+  const notImage = await post(token, form(new Blob(['hello'], { type: 'text/plain' })));
+  check('non-image upload → 415', notImage.status === 415, notImage.status);
+  const demo = await post(null, form(new Blob([jpeg], { type: 'image/jpeg' })), '?demo=1');
+  check('photo upload in demo mode → 409', demo.status === 409, demo.status);
+
+  const box = { x: 0.35, y: 0, w: 0.3, h: 0.2 };
+  const up = await post(token, form(new Blob([jpeg], { type: 'image/jpeg' }), box));
+  const upBody = (await up.json()) as { modelPhotoPath?: string; headBoxSource?: string };
+  check(
+    'photo upload → 201, path under the user, head box from pose',
+    up.status === 201 &&
+      upBody.modelPhotoPath?.startsWith(`${userId}/`) === true &&
+      upBody.headBoxSource === 'pose',
+    upBody,
+  );
+  const path = upBody.modelPhotoPath!;
+  const dir = path.replace(/\/original\.jpg$/, '');
+  const { data: files } = await admin.storage.from('model-photos').list(dir);
+  check(
+    'original and faceless copies stored',
+    JSON.stringify(files?.map((f) => f.name).sort()) === '["faceless.jpg","original.jpg"]',
+    files?.map((f) => f.name),
+  );
+  const { data: stored } = await admin.storage.from('model-photos').download(path);
+  const meta = await sharp(Buffer.from(await stored!.arrayBuffer())).metadata();
+  check('stored original has no EXIF', meta.exif === undefined, Boolean(meta.exif));
+
+  const profile = await call(token, 'GET', '/api/profile');
+  check(
+    'profile records the photo path',
+    profile.json.modelPhotoPath === path,
+    profile.json.modelPhotoPath,
+  );
+
+  const render = await call(token, 'POST', '/api/tryon', { garmentIds: [G.chino], profileId });
+  check(
+    'try-on still works with a photo (mock)',
+    render.status === 202 || render.status === 200,
+    render.json,
+  );
+
+  const replace = await post(token, form(new Blob([jpeg], { type: 'image/jpeg' })));
+  const replaceBody = (await replace.json()) as { modelPhotoPath?: string; headBoxSource?: string };
+  const { data: oldFiles } = await admin.storage.from('model-photos').list(dir);
+  check(
+    'replacing the photo removes the old pair; no head box → fallback blur',
+    replace.status === 201 &&
+      (oldFiles?.length ?? 0) === 0 &&
+      replaceBody.headBoxSource === 'fallback',
+    { status: replace.status, old: oldFiles?.length, source: replaceBody.headBoxSource },
+  );
+
+  const del = await call(token, 'DELETE', '/api/profile/photo');
+  const newDir = replaceBody.modelPhotoPath!.replace(/\/original\.jpg$/, '');
+  const { data: left } = await admin.storage.from('model-photos').list(newDir);
+  const after = await call(token, 'GET', '/api/profile');
+  check(
+    'DELETE photo → 204, files and path removed',
+    del.status === 204 && (left?.length ?? 0) === 0 && after.json.modelPhotoPath === null,
+    { status: del.status, left: left?.length },
+  );
+}
+
 const steps = (process.argv[3] ?? 'all').split(',');
 const users = [await newUser(), await newUser()];
 try {
@@ -433,8 +519,19 @@ try {
   if (steps.includes('all') || steps.includes('tryon'))
     await tryonChecks(a.token, b.token, profileId);
   if (steps.includes('all') || steps.includes('ingest')) await ingestChecks();
+  if (steps.includes('all') || steps.includes('photo'))
+    await photoChecks(a.token, b.token, a.id, profileId);
 } finally {
   const ids = [...users.map((u) => u.id), ...cleanupUserIds];
+  // Deleting a user doesn't delete their storage objects.
+  for (const id of ids) {
+    const { data: dirs } = await admin.storage.from('model-photos').list(id);
+    for (const d of dirs ?? []) {
+      const { data: files } = await admin.storage.from('model-photos').list(`${id}/${d.name}`);
+      const paths = (files ?? []).map((f) => `${id}/${d.name}/${f.name}`);
+      if (paths.length) await admin.storage.from('model-photos').remove(paths);
+    }
+  }
   for (const id of ids) await admin.auth.admin.deleteUser(id);
   console.log(`cleaned up ${ids.length} smoke users`);
 }

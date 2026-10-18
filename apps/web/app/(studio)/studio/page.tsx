@@ -1,6 +1,7 @@
 import Link from 'next/link';
-import { FitPanel } from '@/components/fit-panel';
+import { StudioView } from '@/components/studio-view';
 import { listGarments } from '@/lib/data/garments';
+import { ownPhotoUrl } from '@/lib/data/photos';
 import { getOwnProfile } from '@/lib/data/profiles';
 import { isDemo } from '@/lib/demo';
 import { loadDemoProfile } from '@/lib/fixtures';
@@ -31,16 +32,19 @@ export default async function StudioPage({
   const garments = await listGarments(supabase ? { demo: false, supabase } : { demo: true });
 
   return (
-    <main className="mx-auto max-w-3xl space-y-6 p-8">
+    <main className="mx-auto max-w-5xl space-y-6 p-8">
       <h1 className="text-2xl font-semibold">Studio</h1>
       {profile ? (
-        <FitPanel
+        <StudioView
           garments={garments}
           body={{
             measurements: profile.measurements,
             measurementSource: profile.measurementSource,
             fitPreference: profile.fitPreference,
           }}
+          profileId={profile.id}
+          photoUrl={demo ? null : await ownPhotoUrl(profile)}
+          demo={demo}
           editHref={`/onboarding${query}`}
         />
       ) : (

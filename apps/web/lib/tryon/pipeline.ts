@@ -24,6 +24,8 @@ export interface RenderStore {
   findById(id: string): Promise<RenderRow | null>;
   insert(row: Omit<RenderRow, 'id' | 'createdAt'>): Promise<RenderRow>;
   update(id: string, patch: Partial<Omit<RenderRow, 'id'>>): Promise<void>;
+  // Render rows (one per rendered layer) for a profile and provider since a time.
+  countSince(profileId: string, provider: string, sinceIso: string): Promise<number>;
 }
 
 export interface ImageStore {
@@ -204,4 +206,34 @@ export async function processRender(deps: PipelineDeps, plan: RenderPlan, rowId:
       error: e instanceof Error ? e.message : String(e),
     });
   }
+}
+
+export const RENDER_LIMIT_WINDOW_MS = 24 * 60 * 60 * 1000;
+
+// Layers of the plan that would need a provider call (not cached as done).
+export async function uncachedLayerCount(deps: PipelineDeps, plan: RenderPlan): Promise<number> {
+  let n = 0;
+  for (const key of plan.keys) {
+    const row = await deps.store.findByKey(key);
+    if (row?.status !== 'done') n++;
+  }
+  return n;
+}
+
+export type BudgetCheck = { ok: true } | { ok: false; used: number; needed: number; limit: number };
+
+// Per-profile cap on real-provider layer renders per 24 h, so testing can't run
+// up the bill. The mock is free and never limited; cache hits cost nothing.
+export async function checkRenderBudget(
+  deps: PipelineDeps,
+  plan: RenderPlan,
+  limit: number,
+): Promise<BudgetCheck> {
+  if (deps.provider.name === 'mock') return { ok: true };
+  const needed = await uncachedLayerCount(deps, plan);
+  if (needed === 0) return { ok: true };
+  const now = deps.now?.() ?? new Date();
+  const since = new Date(now.getTime() - RENDER_LIMIT_WINDOW_MS).toISOString();
+  const used = await deps.store.countSince(plan.profileId, deps.provider.name, since);
+  return used + needed <= limit ? { ok: true } : { ok: false, used, needed, limit };
 }

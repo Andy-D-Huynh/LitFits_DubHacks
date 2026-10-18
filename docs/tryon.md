@@ -54,3 +54,11 @@ The render does not reflect size. Always place it next to the fit panel, never a
 - A real provider needs a model photo (409 without one) and a product image for every garment (422). Its outputs are copied into the private `renders` bucket and served with 10-minute signed URLs; mock outputs are local public paths.
 - Demo mode: `POST /api/tryon?demo=1` renders with the mock and returns the image directly (`renderId: null`), with no DB.
 - Writing renders needs `SUPABASE_SERVICE_ROLE_KEY` on the server (503 without it), which is not yet set on Vercel.
+
+## fal and the model photo (2026-10-17)
+
+- **fal is the preferred real provider.** `FalTryOn` (`apps/web/lib/providers/tryon/fal.ts`) calls `fal-ai/fashn/tryon/v1.6` by default (override with `TRYON_MODEL`) through `@fal-ai/client`'s `createFalClient({ credentials: FAL_KEY })`. Input per fal's published schema: `model_image`, `garment_image`, `category` (`tops` | `bottoms` | `one-pieces`; outerwear → `tops`), `mode: balanced`, `garment_photo_type: auto`, `output_format: jpeg`, `num_samples: 1`. Output `images[0].url` is copied into the private `renders` bucket.
+- **Selection** (`select.ts`): `TRYON_PROVIDER=fal` with `FAL_KEY` → fal; `replicate` with its token and model → Replicate; otherwise, and always in demo mode, the mock (with a one-time server warning when a selected provider lacks credentials).
+- **Model photo** (`POST /api/profile/photo`): one full-body JPEG/PNG/WebP up to 10 MB. The server applies EXIF orientation, strips all metadata, caps the long edge at 2048 px and stores two private objects: `original.jpg` (shown only to its owner) and `faceless.jpg`, with the head pixelated and blurred. The browser finds the head with MediaPipe Pose (`headBoxFromLandmarks` in `packages/shared/src/photo.ts`); without a pose the top 22% of the photo is blurred instead. Providers only ever get `faceless.jpg` (unless `face_opt_in`), as a 10-minute signed URL.
+- **Cost guard:** before queueing, `checkRenderBudget` counts the layers that aren't cached and the profile's real-provider renders in the last 24 h; over `TRYON_DAILY_LIMIT` (default 20) → 429. Cache hits and the mock never count.
+- **Smoke test:** `pnpm --filter @fitmirror/web tryon:smoke -- --photo <path> --garment-image <path|url>` makes one real fal render with the production code path (`--dry-run` does everything but the call).

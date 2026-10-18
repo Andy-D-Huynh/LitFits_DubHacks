@@ -189,8 +189,10 @@ SUPABASE_SERVICE_ROLE_KEY
 ANTHROPIC_API_KEY
 LLM_PROVIDER          # anthropic | mock (default mock)
 LLM_MODEL             # default claude-opus-5-5
-TRYON_PROVIDER        # replicate | gemini | mock
-REPLICATE_API_TOKEN
+TRYON_PROVIDER        # fal (preferred) | replicate | mock
+FAL_KEY               # server-only
+TRYON_DAILY_LIMIT     # real-provider renders per profile per 24 h (default 20)
+REPLICATE_API_TOKEN   # optional alternative to fal
 TRYON_MODEL
 GEMINI_API_KEY
 PAYMENT_PROVIDER      # visa | mock
