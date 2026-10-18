@@ -58,3 +58,13 @@ Answer these and the defaults in the docs get replaced. Write answers inline and
 - **Supabase:** hosted project. Keys go in `apps/web/.env.local` (never committed).
 - **Deploy:** Vercel, project root `apps/web`.
 - **Package scope:** `@fitmirror/*` (`@fitmirror/shared`, `@fitmirror/web`, `@fitmirror/extension`).
+
+## Decisions log (back-end lane)
+
+Running list of defaults taken under the Working mode in CLAUDE.md. Each one is also recorded in the doc for its area.
+
+### Step 1: M1 fixes (2026-10-17)
+- "Tight beats loose" is defined as a ranking: overall verdict (good > loose > tight > unknown), then no tight critical dim, then score. See `fit-engine.md` § M1 fixes.
+- Center-of-band tie-break uses the main dim (chest for top/outerwear/dress, waist for bottom); fit preference only breaks a remaining tie.
+- The "no size fits well" warning still returns the closest size as `recommendedSize`; it doesn't null it out.
+- Outerwear offset: chest +6, waist +6, shoulder +1 cm on garment charts only. Numbers are guesses, tunable in `fit-rules.ts`.

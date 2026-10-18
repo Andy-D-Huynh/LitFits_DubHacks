@@ -7,6 +7,7 @@ import type {
   DimResult,
   DimValue,
   FitResult,
+  FitPreference,
   FitType,
   FitVerdict,
   Garment,
@@ -39,6 +40,7 @@ type DimEval = {
   weight: number; // 0 for note-only dims
   score: number;
   distance: number; // cm outside the band, 0 when inside
+  centerDistance: number; // cm from the middle of the band
 };
 type SizeEval = {
   result: SizeResult;
@@ -46,6 +48,9 @@ type SizeEval = {
   missing: MissingDim[];
   qualifies: boolean;
   evaluatedCritical: Dim[];
+  tightCritical: boolean;
+  centerDistance: number; // main dim; Infinity when not evaluated
+  problems: { dim: Dim; verdict: FitVerdict }[]; // non-good scored dims, weight order
 };
 
 const LABEL: Record<Dim, string> = {
@@ -90,11 +95,11 @@ function targetFor(
   stretch: Stretch,
 ): Target | null {
   const fitLabel = `for ${fitType} fit`;
-  const reduced = (band: R.Band): Target => {
+  const reduced = (band: R.Band, label = fitLabel): Target => {
     const cut = R.STRETCH_MIN_EASE_REDUCTION_CM[stretch];
     return cut === 0
-      ? { band, label: fitLabel }
-      : { band: [band[0] - cut, band[1]], label: `${fitLabel} (${stretch} stretch)` };
+      ? { band, label }
+      : { band: [band[0] - cut, band[1]], label: `${label} (${stretch} stretch)` };
   };
 
   if (category === 'bottom') {
@@ -108,7 +113,10 @@ function targetFor(
     return null;
   }
   if (dim === 'chest' || dim === 'waist' || dim === 'shoulder') {
-    return reduced(R.TOP_EASE[dim][fitType]);
+    const base = R.TOP_EASE[dim][fitType];
+    if (category !== 'outerwear') return reduced(base);
+    const offset = R.OUTERWEAR_EASE_OFFSET_CM[dim];
+    return reduced([base[0] + offset, base[1] + offset], `for ${fitType}-fit outerwear`);
   }
   if (category === 'dress' && dim === 'hip') return reduced(R.BOTTOM_HIP_EASE[fitType]);
   return null;
@@ -143,6 +151,7 @@ function evaluateGarmentDim(dim: Dim, value: DimValue, body: number, target: Tar
     weight: 0,
     score: bandScore(distance),
     distance,
+    centerDistance: Math.abs(ease - (min + max) / 2),
   };
 }
 
@@ -162,6 +171,7 @@ function evaluateBodyDim(dim: Dim, value: DimValue, body: number): DimEval {
     weight: 0,
     score: bandScore(distance),
     distance,
+    centerDistance: Math.abs(body - (lo + hi) / 2),
   };
 }
 
@@ -271,6 +281,14 @@ function evaluateSize(
     missing,
     qualifies,
     evaluatedCritical,
+    tightCritical: evals.some(
+      (e) => R.CRITICAL_DIMS.includes(e.result.dim) && e.result.verdict === 'tight',
+    ),
+    centerDistance:
+      evals.find((e) => e.result.dim === R.MAIN_DIM[category])?.centerDistance ?? Infinity,
+    problems: evals
+      .filter((e) => e.result.verdict !== 'good')
+      .map((e) => ({ dim: e.result.dim, verdict: e.result.verdict })),
   };
 }
 
@@ -328,6 +346,45 @@ function confidenceFor(garment: FitGarment, body: FitBody, rec: SizeEval): Confi
   return CONFIDENCE_LEVELS[level]!;
 }
 
+// Lower is better: overall verdict, then any tight critical dim, then score,
+// then closeness to the middle of the main dim's band, then fit preference.
+function rankSizes(sizes: SizeEval[], preference: FitPreference): SizeEval {
+  const sorted = [...sizes].sort(
+    (a, b) =>
+      R.VERDICT_RANK[a.result.overall] - R.VERDICT_RANK[b.result.overall] ||
+      Number(a.tightCritical) - Number(b.tightCritical) ||
+      (Math.abs(a.result.score - b.result.score) > R.SCORE_TIE_EPSILON
+        ? b.result.score - a.result.score
+        : 0) ||
+      (a.centerDistance === b.centerDistance ? 0 : a.centerDistance - b.centerDistance) ||
+      (preference === 'snug' ? a.index - b.index : b.index - a.index),
+  );
+  return sorted[0]!;
+}
+
+const PLACE: Partial<Record<Dim, string>> = {
+  chest: 'the chest',
+  waist: 'the waist',
+  hip: 'the hip',
+  shoulder: 'the shoulders',
+};
+
+function problemPhrase({ dim, verdict }: { dim: Dim; verdict: FitVerdict }): string {
+  if (dim === 'inseam') return `${verdictWord(dim, verdict)} in the inseam`;
+  return `${verdict} at ${PLACE[dim] ?? LABEL[dim].toLowerCase()}`;
+}
+
+function noGoodFitLine(rec: SizeEval): string {
+  const issues = rec.problems.map(problemPhrase);
+  const detail =
+    issues.length === 0
+      ? ''
+      : issues.length === 1
+        ? `, but it is ${issues[0]}`
+        : `, but it is ${issues.slice(0, -1).join(', ')} and ${issues[issues.length - 1]}`;
+  return `No size fits well. The closest is ${rec.result.size}${detail}.`;
+}
+
 function missingLine({ dim, reason }: MissingDim): string {
   const name = LABEL[dim].toLowerCase();
   return reason === 'chart'
@@ -375,10 +432,9 @@ export function computeFit(garment: FitGarment, body: FitBody): FitResult {
         `Between ${between.lower.result.size} and ${between.upper.result.size} on ${between.dim}; recommending ${rec.result.size} for ${body.fitPreference} fit.`,
       );
     } else {
-      const best = Math.max(...qualified.map((s) => s.result.score));
-      const tied = qualified.filter((s) => best - s.result.score <= R.SCORE_TIE_EPSILON);
-      rec = body.fitPreference === 'snug' ? tied[0]! : tied[tied.length - 1]!;
+      rec = rankSizes(qualified, body.fitPreference);
     }
+    if (rec.result.overall !== 'good') warnings.push(noGoodFitLine(rec));
   }
 
   for (const line of sizes.flatMap((s) => s.missing.map(missingLine))) {

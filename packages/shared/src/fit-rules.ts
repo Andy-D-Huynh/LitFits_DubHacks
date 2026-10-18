@@ -63,3 +63,20 @@ export const GOOD_SCORE_THRESHOLD = 0.8;
 export const TIGHT_MARGIN_CM = 3;
 export const LOOSE_MARGIN_CM = 6;
 export const SCORE_TIE_EPSILON = 1e-9;
+
+// Outerwear is worn over other layers, so its garment-chart bands shift up.
+// Body-chart outerwear is unaffected (the brand's ranges already allow for it).
+export const OUTERWEAR_EASE_OFFSET_CM: Record<'chest' | 'waist' | 'shoulder', number> = {
+  chest: 6,
+  waist: 6,
+  shoulder: 1,
+};
+
+// Recommendation ranking: overall verdict first (a size you can't get into is
+// worse than one that's roomy), then whether any critical dim is tight, then score.
+export const VERDICT_RANK: Record<'good' | 'loose' | 'tight' | 'unknown', number> = {
+  good: 0,
+  loose: 1,
+  tight: 2,
+  unknown: 3,
+};

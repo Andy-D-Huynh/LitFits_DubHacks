@@ -222,6 +222,73 @@ describe('recommendation', () => {
     expect(computeFit(g, body({ chest: 98 }, { fitPreference: 'snug' })).recommendedSize).toBe('S');
   });
 
+  it('ranks a loose size above a tight one even with a lower score', () => {
+    // S: 5 cm ease (score 0.7, tight). L: 22 cm ease (score 0.4, loose).
+    const r = computeFit(
+      garment({
+        rows: [
+          { label: 'S', chest: 103 },
+          { label: 'L', chest: 120 },
+        ],
+      }),
+      body({ chest: 98 }),
+    );
+    expect(r.perSize.map((s) => s.overall)).toEqual(['tight', 'loose']);
+    expect(r.recommendedSize).toBe('L');
+  });
+
+  it('prefers a size with no tight critical dim among good sizes', () => {
+    // 32 scores higher but its waist is tight; 34's waist fits and only the hip is loose.
+    const r = computeFit(
+      garment({
+        category: 'bottom',
+        chartType: 'body',
+        rows: [
+          { label: '32', waist: [79, 83], hip: [97, 101], inseam: [80, 84] },
+          { label: '34', waist: [84, 88], hip: [102, 106], inseam: [80, 84] },
+        ],
+      }),
+      body({ waist: 84, hip: 99, inseam: 81 }),
+    );
+    expect(r.perSize.map((s) => s.overall)).toEqual(['good', 'good']);
+    expect(r.perSize[0]!.score).toBeGreaterThan(r.perSize[1]!.score);
+    expect(r.recommendedSize).toBe('34');
+  });
+
+  it('breaks score ties by closeness to the middle of the main band', () => {
+    // Both score 1; L's 10 cm ease is nearer the 8–16 midpoint than XL's 16.
+    const r = computeFit(
+      garment({
+        rows: [
+          { label: 'L', chest: 108 },
+          { label: 'XL', chest: 114 },
+        ],
+      }),
+      body({ chest: 98 }),
+    );
+    expect(r.recommendedSize).toBe('L');
+  });
+
+  it('warns clearly when no size fits well', () => {
+    const r = computeFit(
+      garment({
+        category: 'dress',
+        chartType: 'body',
+        rows: [{ label: 'L', chest: [93, 98], waist: [75, 80], hip: [101, 106] }],
+      }),
+      body({ chest: 98, waist: 84, hip: 99 }),
+    );
+    expect(r.recommendedSize).toBe('L');
+    expect(r.warnings).toContain(
+      'No size fits well. The closest is L, but it is tight at the waist and loose at the hip.',
+    );
+  });
+
+  it('does not add the no-good-fit warning when the pick is good', () => {
+    const r = computeFit(garment(), body({ chest: 98 }));
+    expect(r.warnings.some((w) => w.startsWith('No size fits well'))).toBe(false);
+  });
+
   it('recommends a chest-only top chart', () => {
     expect(computeFit(garment(), body({ chest: 98 })).recommendedSize).toBe('M');
   });
@@ -305,9 +372,23 @@ describe('categories and note-only dims', () => {
     expect(r.perSize[0]?.overall).toBe('good');
   });
 
-  it('fits outerwear with the top bands', () => {
+  it('fits outerwear with the top bands shifted for layering', () => {
     const r = computeFit(garment({ category: 'outerwear' }), body({ chest: 98 }));
-    expect(dim(r, 'M', 'chest')?.note).toContain('target for regular fit is 8 to 16');
+    expect(dim(r, 'M', 'chest')?.note).toBe(
+      'Chest: 12 cm of ease, target for regular-fit outerwear is 14 to 22, so tight.',
+    );
+  });
+
+  it('does not shift body-chart outerwear', () => {
+    const r = computeFit(
+      garment({
+        category: 'outerwear',
+        chartType: 'body',
+        rows: [{ label: 'M', chest: [96, 100] }],
+      }),
+      body({ chest: 98 }),
+    );
+    expect(dim(r, 'M', 'chest')?.verdict).toBe('good');
   });
 
   it('reports sleeve as an unscored note', () => {

@@ -75,3 +75,11 @@ Defaults taken where the spec is silent (change here if wrong):
 - **Unknown inputs:** no chart or chart type → no recommendation. A garment chart with unknown basis → no recommendation, since flat vs circumference is a 2× difference. Unknown fit type → regular targets plus a warning.
 - **Mixed values:** a range in a garment chart uses its midpoint; a single number in a body chart is a one-point range.
 - **Length** produces no `DimResult` (no body measurement to compare).
+
+## M1 fixes (2026-10-17)
+
+- **Ranking (tight beats loose):** a size's rank is decided first by overall verdict (good, then loose, then tight, then unknown), then by whether any critical dim is tight, then by score. A roomy size outranks one you can't get into, and among good sizes one with a tight waist or chest loses to one without.
+- **Tie-break:** sizes with equal score go to the one whose main dim sits closest to the middle of its band or range; fit preference (snug → smaller) only breaks a remaining tie. This replaced "regular picks the larger", which recommended sizes sitting at the band's edge.
+- **No size fits well:** when the recommended size's overall verdict isn't `good`, a warning names it and what's wrong, e.g. "No size fits well. The closest is L, but it is tight at the waist and loose at the hip." The size is still recommended.
+- **Outerwear offset:** garment-chart outerwear bands shift up by `OUTERWEAR_EASE_OFFSET_CM` (chest +6, waist +6, shoulder +1) to allow for layers underneath. Body-chart outerwear is not shifted.
+- Between-sizes on body charts still overrides ranking.
