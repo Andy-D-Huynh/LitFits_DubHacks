@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="768" height="1024" viewBox="0 0 768 1024">
+  <rect width="768" height="1024" fill="#f4f4f5"/>
+  <circle cx="384" cy="210" r="70" fill="#d4d4d8"/>
+  <path d="M254 330 Q384 290 514 330 L560 640 L470 650 L460 960 L308 960 L298 650 L208 640 Z" fill="#d4d4d8"/>
+  <text x="384" y="1000" font-family="system-ui, sans-serif" font-size="28" fill="#71717a" text-anchor="middle">Try-on preview unavailable</text>
+</svg>

@@ -1,0 +1,6 @@
+packages:
+  - apps/*
+  - packages/*
+allowBuilds:
+  # tsx uses esbuild's prebuilt platform binary; its postinstall check isn't needed.
+  esbuild: false

@@ -1,0 +1,29 @@
+{
+  "id": "00000000-0000-4000-8000-000000000007",
+  "placeholder": true,
+  "sourceUrl": null,
+  "retailer": null,
+  "brand": null,
+  "name": "Placeholder chore jacket",
+  "category": "outerwear",
+  "imageUrls": [],
+  "primaryImageUrl": null,
+  "primaryColor": "olive",
+  "priceCents": 11900,
+  "currency": "USD",
+  "fitType": "regular",
+  "stretch": "none",
+  "chartType": "garment",
+  "measurementBasis": "circumference",
+  "sizeChart": {
+    "unit": "cm",
+    "rows": [
+      { "label": "S", "chest": 108, "shoulder": 45, "sleeve": 64, "length": 70 },
+      { "label": "M", "chest": 114, "shoulder": 47, "sleeve": 65, "length": 72 },
+      { "label": "L", "chest": 120, "shoulder": 49, "sleeve": 66, "length": 74 },
+      { "label": "XL", "chest": 126, "shoulder": 51, "sleeve": 67, "length": 76 }
+    ]
+  },
+  "extractionMethod": "fixture",
+  "extractionConfidence": null
+}

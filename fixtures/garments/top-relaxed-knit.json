@@ -1,0 +1,29 @@
+{
+  "id": "00000000-0000-4000-8000-000000000003",
+  "placeholder": true,
+  "sourceUrl": null,
+  "retailer": null,
+  "brand": null,
+  "name": "Placeholder relaxed knit sweater",
+  "category": "top",
+  "imageUrls": [],
+  "primaryImageUrl": null,
+  "primaryColor": "oatmeal",
+  "priceCents": 6900,
+  "currency": "USD",
+  "fitType": "relaxed",
+  "stretch": "high",
+  "chartType": "body",
+  "measurementBasis": "circumference",
+  "sizeChart": {
+    "unit": "cm",
+    "rows": [
+      { "label": "S", "chest": [84, 89], "waist": [71, 76] },
+      { "label": "M", "chest": [90, 97], "waist": [77, 84] },
+      { "label": "L", "chest": [98, 105], "waist": [85, 92] },
+      { "label": "XL", "chest": [106, 113], "waist": [93, 100] }
+    ]
+  },
+  "extractionMethod": "fixture",
+  "extractionConfidence": null
+}

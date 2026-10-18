@@ -1,0 +1,30 @@
+{
+  "id": "00000000-0000-4000-8000-000000000004",
+  "placeholder": true,
+  "sourceUrl": null,
+  "retailer": null,
+  "brand": null,
+  "name": "Placeholder straight jean",
+  "category": "bottom",
+  "imageUrls": [],
+  "primaryImageUrl": null,
+  "primaryColor": "indigo",
+  "priceCents": 7900,
+  "currency": "USD",
+  "fitType": "regular",
+  "stretch": "low",
+  "chartType": "body",
+  "measurementBasis": "circumference",
+  "sizeChart": {
+    "unit": "cm",
+    "rows": [
+      { "label": "28", "waist": [70, 73], "hip": [88, 91], "inseam": [79, 83] },
+      { "label": "30", "waist": [74, 78], "hip": [92, 96], "inseam": [79, 83] },
+      { "label": "32", "waist": [79, 83], "hip": [97, 101], "inseam": [80, 84] },
+      { "label": "34", "waist": [84, 88], "hip": [102, 106], "inseam": [80, 84] },
+      { "label": "36", "waist": [89, 93], "hip": [107, 111], "inseam": [81, 85] }
+    ]
+  },
+  "extractionMethod": "fixture",
+  "extractionConfidence": null
+}

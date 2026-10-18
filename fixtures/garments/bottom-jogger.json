@@ -1,0 +1,29 @@
+{
+  "id": "00000000-0000-4000-8000-000000000006",
+  "placeholder": true,
+  "sourceUrl": null,
+  "retailer": null,
+  "brand": null,
+  "name": "Placeholder relaxed jogger (no inseam in chart)",
+  "category": "bottom",
+  "imageUrls": [],
+  "primaryImageUrl": null,
+  "primaryColor": "heather grey",
+  "priceCents": 4500,
+  "currency": "USD",
+  "fitType": "relaxed",
+  "stretch": "high",
+  "chartType": "garment",
+  "measurementBasis": "flat",
+  "sizeChart": {
+    "unit": "cm",
+    "rows": [
+      { "label": "S", "waist": 34, "hip": 54 },
+      { "label": "M", "waist": 37, "hip": 57 },
+      { "label": "L", "waist": 40, "hip": 60 },
+      { "label": "XL", "waist": 43, "hip": 63 }
+    ]
+  },
+  "extractionMethod": "fixture",
+  "extractionConfidence": null
+}
