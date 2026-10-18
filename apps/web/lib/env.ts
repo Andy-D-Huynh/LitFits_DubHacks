@@ -16,6 +16,11 @@ const ServerEnvSchema = z.object({
   TRYON_PROVIDER: z.enum(['fal', 'replicate', 'gemini', 'mock']).default('mock'),
   FAL_KEY: optional,
   TRYON_DAILY_LIMIT: z.coerce.number().int().positive().default(20),
+  // Session-less extension try-on (POST /api/tryon/direct); always on in dev.
+  TRYON_DIRECT_ENABLED: z
+    .enum(['true', 'false'])
+    .default('false')
+    .transform((v) => v === 'true'),
   REPLICATE_API_TOKEN: optional,
   TRYON_MODEL: optional,
   GEMINI_API_KEY: optional,

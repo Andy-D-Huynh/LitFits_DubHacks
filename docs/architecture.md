@@ -167,6 +167,9 @@ type FitResult = {
 **Try-on**
 - `POST /api/tryon` takes `garmentIds`, `profileId` → `{ renderId, status }`. Cache hit returns `done` immediately.
 - `GET /api/tryon/:id` → status and signed image URL.
+- `POST /api/tryon/direct`: the extension prototype's session-less try-on; see `docs/tryon.md`. Off in production unless `TRYON_DIRECT_ENABLED=true`.
+- `POST /api/products/extract` (extension prototype): fetches a product URL server-side and returns name, brand, image and a guessed category. No size chart; to be folded into ingest.
+- `GET /api/cart`: liked product links (local dev file).
 
 **Outfits**
 - `GET/POST /api/outfits` (create takes `profileId`, optional `name`), `GET/DELETE /api/outfits/:id`.
@@ -192,6 +195,7 @@ LLM_MODEL             # default claude-opus-5-5
 TRYON_PROVIDER        # fal (preferred) | replicate | mock
 FAL_KEY               # server-only
 TRYON_DAILY_LIMIT     # real-provider renders per profile per 24 h (default 20)
+TRYON_DIRECT_ENABLED  # true enables /api/tryon/direct in production (default false)
 REPLICATE_API_TOKEN   # optional alternative to fal
 TRYON_MODEL
 GEMINI_API_KEY

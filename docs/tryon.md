@@ -57,8 +57,18 @@ The render does not reflect size. Always place it next to the fit panel, never a
 
 ## fal and the model photo (2026-10-17)
 
-- **fal is the preferred real provider.** `FalTryOn` (`apps/web/lib/providers/tryon/fal.ts`) calls `fal-ai/fashn/tryon/v1.6` by default (override with `TRYON_MODEL`) through `@fal-ai/client`'s `createFalClient({ credentials: FAL_KEY })`. Input per fal's published schema: `model_image`, `garment_image`, `category` (`tops` | `bottoms` | `one-pieces`; outerwear → `tops`), `mode: balanced`, `garment_photo_type: auto`, `output_format: jpeg`, `num_samples: 1`. Output `images[0].url` is copied into the private `renders` bucket.
+- **fal is the preferred real provider.** `FalTryOn` (`apps/web/lib/providers/tryon/fal.ts`) calls `fal-ai/fashn/tryon/v1.6` by default (override with `TRYON_MODEL`) through `@fal-ai/client`'s `createFalClient({ credentials: FAL_KEY })`. Input per fal's published schema: `model_image`, `garment_image`, `category` (`tops` | `bottoms` | `one-pieces`; outerwear → `tops`), `mode: balanced`, `garment_photo_type: auto`, `moderation_level: permissive`, `segmentation_free: true`, `output_format: png`, `num_samples: 1` (the last four as in the extension prototype, which was verified live). Output `images[0].url` is copied into the private `renders` bucket.
 - **Selection** (`select.ts`): `TRYON_PROVIDER=fal` with `FAL_KEY` → fal; `replicate` with its token and model → Replicate; otherwise, and always in demo mode, the mock (with a one-time server warning when a selected provider lacks credentials).
 - **Model photo** (`POST /api/profile/photo`): one full-body JPEG/PNG/WebP up to 10 MB. The server applies EXIF orientation, strips all metadata, caps the long edge at 2048 px and stores two private objects: `original.jpg` (shown only to its owner) and `faceless.jpg`, with the head pixelated and blurred. The browser finds the head with MediaPipe Pose (`headBoxFromLandmarks` in `packages/shared/src/photo.ts`); without a pose the top 22% of the photo is blurred instead. Providers only ever get `faceless.jpg` (unless `face_opt_in`), as a 10-minute signed URL.
 - **Cost guard:** before queueing, `checkRenderBudget` counts the layers that aren't cached and the profile's real-provider renders in the last 24 h; over `TRYON_DAILY_LIMIT` (default 20) → 429. Cache hits and the mock never count.
 - **Smoke test:** `pnpm --filter @fitmirror/web tryon:smoke -- --photo <path> --garment-image <path|url>` makes one real fal render with the production code path (`--dry-run` does everything but the call).
+
+## Extension prototype route (2026-10-17)
+
+- `POST /api/tryon/direct` keeps the extension prototype's flow working: no session, `{ modelImage, garmentImage, productUrl, name, retailer?, category? }` with images inline (data URL or http URL), waits for fal and returns `{ imageUrl, cart }`. The extension chains by sending the previous render as `modelImage`.
+- It uses the same `FalTryOn` as the pipeline (`renderImages`); free-text categories map through `falCategoryFromText` (`footwear`, `accessory` → `auto`).
+- Guards, since there is no profile: an in-memory result cache keyed on both images and the category, and a per-IP limit of `TRYON_DAILY_LIMIT` per 24 h (per server instance). Demo mode returns the mock placeholder; no `FAL_KEY` → 503.
+- Off in production (404) unless `TRYON_DIRECT_ENABLED=true`, because the guards are best effort and the route can spend fal credit for anyone who can reach it.
+- **Open (privacy):** this route sends the user's unblurred photo, as the extension stores it. Until the extension moves to the profile photo (faceless copy) and `POST /api/tryon`, treat it as face opt-in and keep it to local dev.
+- The liked-links file (`apps/web/.data/`) is a local-dev convenience; a write failure (read-only filesystem on Vercel) no longer fails a render.
+

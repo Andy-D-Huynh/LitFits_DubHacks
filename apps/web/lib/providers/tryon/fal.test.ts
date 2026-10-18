@@ -1,5 +1,11 @@
 import { describe, expect, it, vi } from 'vitest';
-import { DEFAULT_FAL_TRYON_MODEL, FalTryOn, toFalInput, type FalSubscribe } from './fal';
+import {
+  DEFAULT_FAL_TRYON_MODEL,
+  FalTryOn,
+  falCategoryFromText,
+  toFalInput,
+  type FalSubscribe,
+} from './fal';
 import { selectTryOnProvider } from './select';
 
 // fal is always mocked here: no test makes a network call.
@@ -25,7 +31,9 @@ describe('FalTryOn', () => {
       category: 'tops',
       mode: 'balanced',
       garment_photo_type: 'auto',
-      output_format: 'jpeg',
+      moderation_level: 'permissive',
+      segmentation_free: true,
+      output_format: 'png',
       num_samples: 1,
     });
   });
@@ -34,6 +42,32 @@ describe('FalTryOn', () => {
     expect(toFalInput({ ...input, category: 'upper_body' }).category).toBe('tops');
     expect(toFalInput({ ...input, category: 'lower_body' }).category).toBe('bottoms');
     expect(toFalInput({ ...input, category: 'dresses' }).category).toBe('one-pieces');
+  });
+
+  it('maps free-text extension categories, falling back to auto', () => {
+    expect(falCategoryFromText('top')).toBe('tops');
+    expect(falCategoryFromText('outerwear')).toBe('tops');
+    expect(falCategoryFromText('bottom')).toBe('bottoms');
+    expect(falCategoryFromText('dress')).toBe('one-pieces');
+    expect(falCategoryFromText('footwear')).toBe('auto');
+    expect(falCategoryFromText(undefined)).toBe('auto');
+  });
+
+  it('renderImages sends fal-ready images unchanged', async () => {
+    const subscribe = vi.fn<FalSubscribe>().mockResolvedValue({
+      data: { images: [{ url: 'https://v3.fal.media/d.png' }] },
+      requestId: 'r',
+    });
+    const out = await new FalTryOn(subscribe).renderImages({
+      modelImage: 'data:image/jpeg;base64,AAAA',
+      garmentImage: 'https://shop.test/shoe.jpg',
+      category: 'auto',
+    });
+    expect(out.imageUrl).toBe('https://v3.fal.media/d.png');
+    expect(subscribe.mock.calls[0]![1]).toMatchObject({
+      model_image: 'data:image/jpeg;base64,AAAA',
+      category: 'auto',
+    });
   });
 
   it('uses the configured endpoint', async () => {

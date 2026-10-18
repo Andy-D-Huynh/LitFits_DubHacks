@@ -164,7 +164,7 @@ try {
     const out = await new FalTryOn(falSubscribeWithKey(falKey!), endpoint).render(input);
     const res = await fetch(out.imageUrl);
     if (!res.ok) fail(`downloading the render failed (${res.status})`);
-    const file = join(outDir, `tryon-${new Date().toISOString().replace(/[:.]/g, '-')}.jpg`);
+    const file = join(outDir, `tryon-${new Date().toISOString().replace(/[:.]/g, '-')}.png`);
     writeFileSync(file, Buffer.from(await res.arrayBuffer()));
     console.log(`render: ${((Date.now() - started) / 1000).toFixed(1)} s → ${file}`);
   }
