@@ -82,7 +82,9 @@ export function buildFluxPrompt(
       break;
   }
 
-  return `High-end commercial fashion studio photography. The person wears ${targetGarment} from the reference image. The clothing needs to be the exact same color as the garment image. ${isolationDirective} ${colorSpec} ${fitDirective} Seamless realistic lighting, perfect fabric textures, 8k resolution.`;
+  const backgroundDirective = 'BACKGROUND REQUIREMENT: Change the background to a clean, solid, seamless plain white studio background.';
+
+  return `High-end commercial fashion studio photography on a solid plain white background. The person wears ${targetGarment} from the reference image. The clothing needs to be the exact same color as the garment image. ${backgroundDirective} ${isolationDirective} ${colorSpec} ${fitDirective} Seamless realistic lighting, perfect fabric textures, 8k resolution.`;
 }
 
 async function uploadIfDataUri(urlOrDataUri: string): Promise<string> {
