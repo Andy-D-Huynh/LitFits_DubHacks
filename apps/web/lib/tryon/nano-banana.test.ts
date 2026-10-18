@@ -22,4 +22,11 @@ describe('buildNanoBananaPrompt', () => {
     const prompt = buildNanoBananaPrompt('Sweater', 'top', 'cropped');
     expect(prompt).toContain('FIT SPECIFICATION: Wear this the top/jacket (Sweater) neatly cropped / tucked in');
   });
+
+  it('hardcodes DO NOT CHANGE THE FACE into the prompt', () => {
+    const prompt = buildNanoBananaPrompt('Cardigan', 'outerwear', 'tight', 'red');
+    expect(prompt).toContain('DO NOT CHANGE THE FACE');
+    expect(prompt).toContain("Strictly preserve the person's exact face, facial features");
+  });
 });
+

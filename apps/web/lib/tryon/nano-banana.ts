@@ -86,10 +86,13 @@ export function buildNanoBananaPrompt(
       break;
   }
 
+  const faceDirective =
+    'FACE REQUIREMENT: DO NOT CHANGE THE FACE. Strictly preserve the person\'s exact face, facial features, expression, eyes, skin tone, hair, and head from the first image with 100% identity fidelity. DO NOT CHANGE THE FACE.';
+
   const backgroundDirective =
     'BACKGROUND REQUIREMENT: Change the background to a clean, solid, seamless plain white studio background.';
 
-  return `High-end commercial fashion studio photography on a solid plain white background. The person in the first image wears ${targetGarment} from the second reference garment image. The clothing needs to be the exact same color as the garment image. ${backgroundDirective} ${isolationDirective} ${colorSpec} ${fitDirective} Seamless realistic lighting, perfect fabric textures, 8k resolution.`;
+  return `High-end commercial fashion studio photography on a solid plain white background. The person in the first image wears ${targetGarment} from the second reference garment image. The clothing needs to be the exact same color as the garment image. DO NOT CHANGE THE FACE. ${faceDirective} ${backgroundDirective} ${isolationDirective} ${colorSpec} ${fitDirective} Seamless realistic lighting, perfect fabric textures, 8k resolution.`;
 }
 
 async function uploadIfDataUri(urlOrDataUri: string): Promise<string> {
@@ -134,6 +137,8 @@ export async function renderNanoBananaTryOn(input: NanoBananaTryOnInput): Promis
   const result = await fal.subscribe('fal-ai/nano-banana-pro/edit', {
     input: {
       prompt,
+      system_prompt:
+        "DO NOT CHANGE THE FACE. Strictly preserve the person's exact face, facial features, identity, expression, and hairstyle from the first image with zero modification.",
       image_urls: [humanImageUrl, garmentImageUrl],
       num_images: 1,
       aspect_ratio: 'auto',
